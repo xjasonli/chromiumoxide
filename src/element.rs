@@ -14,30 +14,73 @@ use chromiumoxide_cdp::cdp::browser_protocol::page::{
     CaptureScreenshotFormat, CaptureScreenshotParams, Viewport,
 };
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    CallFunctionOnReturns, GetPropertiesParams, PropertyDescriptor, RemoteObjectId,
+    CallFunctionOnReturns, GetPropertiesParams, PropertyDescriptor,
     RemoteObjectType,
 };
+
+use async_once_cell::OnceCell;
 
 use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
 use crate::layout::{BoundingBox, BoxModel, ElementQuad, Point};
 use crate::utils;
+use crate::js::object::JsObject;
 
 /// Represents a [DOM Element](https://developer.mozilla.org/en-US/docs/Web/API/Element).
 #[derive(Debug)]
 pub struct Element {
-    /// The Unique object identifier
-    pub remote_object_id: RemoteObjectId,
-    /// Identifier of the backend node.
-    pub backend_node_id: BackendNodeId,
-    /// The identifier of the node this element represents.
-    pub node_id: NodeId,
-    tab: Arc<PageInner>,
+    pub(crate) object: JsObject,
+    node_ids: OnceCell<NodeIds>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NodeIds {
+    id: NodeId,
+    backend_id: BackendNodeId,
 }
 
 impl Element {
-    pub(crate) async fn new(tab: Arc<PageInner>, node_id: NodeId) -> Result<Self> {
-        let backend_node_id = tab
+    pub fn from_object(object: JsObject) -> Self {
+        Self {
+            object,
+            node_ids: OnceCell::new(),
+        }
+    }
+
+    pub fn object(&self) -> &JsObject {
+        &self.object
+    }
+
+    pub async fn node_id(&self) -> Result<NodeId> {
+        Ok(self.node_ids().await?.id)
+    }
+
+    pub async fn backend_node_id(&self) -> Result<BackendNodeId> {
+        Ok(self.node_ids().await?.backend_id)
+    }
+
+    async fn node_ids(&self) -> Result<&NodeIds> {
+        let future = async {
+            self.object.page
+                .execute(DescribeNodeParams::builder()
+                    .object_id(self.object.object_id.clone())
+                    .build())
+                .await
+                .map(|resp| NodeIds {
+                    id: resp.result.node.node_id,
+                    backend_id: resp.result.node.backend_node_id,
+                })
+        };
+
+        self.node_ids.get_or_try_init(future).await
+    }
+
+    fn page(&self) -> Arc<PageInner> {
+        self.object.page.clone()
+    }
+
+    pub(crate) async fn new_with_node_id(page: Arc<PageInner>, node_id: NodeId) -> Result<Self> {
+        let backend_node_id = page
             .execute(
                 DescribeNodeParams::builder()
                     .node_id(node_id)
@@ -48,7 +91,7 @@ impl Element {
             .node
             .backend_node_id;
 
-        let resp = tab
+        let resp = page
             .execute(
                 ResolveNodeParams::builder()
                     .backend_node_id(backend_node_id)
@@ -62,10 +105,16 @@ impl Element {
             .object_id
             .ok_or_else(|| CdpError::msg(format!("No object Id found for {node_id:?}")))?;
         Ok(Self {
-            remote_object_id,
-            backend_node_id,
-            node_id,
-            tab,
+            object: JsObject {
+                object_id: remote_object_id,
+                page,
+            },
+            node_ids: OnceCell::new_with(
+                NodeIds {
+                    id: node_id,
+                    backend_id: backend_node_id,
+                }
+            ),
         })
     }
 
@@ -75,7 +124,7 @@ impl Element {
             node_ids
                 .iter()
                 .copied()
-                .map(|id| Element::new(Arc::clone(tab), id)),
+                .map(|id| Element::new_with_node_id(Arc::clone(tab), id)),
         )
         .await
         .into_iter()
@@ -85,25 +134,25 @@ impl Element {
     /// Returns the first element in the document which matches the given CSS
     /// selector.
     pub async fn find_element(&self, selector: impl Into<String>) -> Result<Self> {
-        let node_id = self.tab.find_element(selector, self.node_id).await?;
-        Element::new(Arc::clone(&self.tab), node_id).await
+        let node_id = self.page().find_element(selector, self.node_id().await?).await?;
+        Element::new_with_node_id(Arc::clone(&self.page()), node_id).await
     }
 
     /// Return all `Element`s in the document that match the given selector
     pub async fn find_elements(&self, selector: impl Into<String>) -> Result<Vec<Element>> {
         Element::from_nodes(
-            &self.tab,
-            &self.tab.find_elements(selector, self.node_id).await?,
+            &self.page(),
+            &self.page().find_elements(selector, self.node_id().await?).await?,
         )
         .await
     }
 
     async fn box_model(&self) -> Result<BoxModel> {
         let model = self
-            .tab
+            .page()
             .execute(
                 GetBoxModelParams::builder()
-                    .backend_node_id(self.backend_node_id)
+                    .backend_node_id(self.backend_node_id().await?)
                     .build(),
             )
             .await?
@@ -140,10 +189,10 @@ impl Element {
     /// Returns the best `Point` of this node to execute a click on.
     pub async fn clickable_point(&self) -> Result<Point> {
         let content_quads = self
-            .tab
+            .page()
             .execute(
                 GetContentQuadsParams::builder()
-                    .backend_node_id(self.backend_node_id)
+                    .backend_node_id(self.backend_node_id().await?)
                     .build(),
             )
             .await?;
@@ -189,11 +238,11 @@ impl Element {
         function_declaration: impl Into<String>,
         await_promise: bool,
     ) -> Result<CallFunctionOnReturns> {
-        self.tab
+        self.page()
             .call_js_fn(
                 function_declaration,
                 await_promise,
-                self.remote_object_id.clone(),
+                self.object.object_id.clone(),
             )
             .await
     }
@@ -217,7 +266,7 @@ impl Element {
     /// over the center of this element.
     pub async fn hover(&self) -> Result<&Self> {
         self.scroll_into_view().await?;
-        self.tab.move_mouse(self.clickable_point().await?).await?;
+        self.page().move_mouse(self.clickable_point().await?).await?;
         Ok(self)
     }
 
@@ -267,7 +316,7 @@ impl Element {
     /// not exist anymore.
     pub async fn click(&self) -> Result<&Self> {
         let center = self.scroll_into_view().await?.clickable_point().await?;
-        self.tab.click(center).await?;
+        self.page().click(center).await?;
         Ok(self)
     }
 
@@ -285,7 +334,7 @@ impl Element {
     /// # }
     /// ```
     pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
-        self.tab.type_str(input).await?;
+        self.page().type_str(input).await?;
         Ok(self)
     }
 
@@ -304,17 +353,17 @@ impl Element {
     /// # }
     /// ```
     pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
-        self.tab.press_key(key).await?;
+        self.page().press_key(key).await?;
         Ok(self)
     }
 
     /// The description of the element's node
     pub async fn description(&self) -> Result<Node> {
         Ok(self
-            .tab
+            .page()
             .execute(
                 DescribeNodeParams::builder()
-                    .backend_node_id(self.backend_node_id)
+                    .backend_node_id(self.backend_node_id().await?)
                     .depth(100)
                     .build(),
             )
@@ -398,10 +447,10 @@ impl Element {
     /// Returns a map with all `PropertyDescriptor`s of this element keyed by
     /// their names
     pub async fn properties(&self) -> Result<HashMap<String, PropertyDescriptor>> {
-        let mut params = GetPropertiesParams::new(self.remote_object_id.clone());
+        let mut params = GetPropertiesParams::new(self.object.object_id.clone());
         params.own_properties = Some(true);
 
-        let properties = self.tab.execute(params).await?;
+        let properties = self.page().execute(params).await?;
 
         Ok(properties
             .result
@@ -414,7 +463,7 @@ impl Element {
     /// Scrolls the element into and takes a screenshot of it
     pub async fn screenshot(&self, format: CaptureScreenshotFormat) -> Result<Vec<u8>> {
         let mut bounding_box = self.scroll_into_view().await?.bounding_box().await?;
-        let viewport = self.tab.layout_metrics().await?.css_layout_viewport;
+        let viewport = self.page().layout_metrics().await?.css_layout_viewport;
 
         bounding_box.x += viewport.page_x as f64;
         bounding_box.y += viewport.page_y as f64;
@@ -427,7 +476,7 @@ impl Element {
             scale: 1.,
         };
 
-        self.tab
+        self.page()
             .screenshot(
                 CaptureScreenshotParams::builder()
                     .format(format)
@@ -486,5 +535,17 @@ impl<'a> Stream for AttributeStream<'a> {
             }
         }
         Poll::Pending
+    }
+}
+
+impl From<JsObject> for Element {
+    fn from(object: JsObject) -> Self {
+        Self::from_object(object)
+    }
+}
+
+impl From<&JsObject> for Element {
+    fn from(object: &JsObject) -> Self {
+        Self::from_object(object.clone())
     }
 }

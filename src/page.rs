@@ -20,8 +20,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::target::{SessionId, TargetId};
 use chromiumoxide_cdp::cdp::js_protocol;
 use chromiumoxide_cdp::cdp::js_protocol::debugger::GetScriptSourceParams;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    AddBindingParams, CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId,
-    RemoteObjectType, ScriptId,
+    AddBindingParams, CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId, RemoteObjectType, ScriptId
 };
 use chromiumoxide_cdp::cdp::{browser_protocol, IntoEventKind};
 use chromiumoxide_types::*;
@@ -34,7 +33,7 @@ use crate::handler::domworld::DOMWorldKind;
 use crate::handler::httpfuture::HttpFuture;
 use crate::handler::target::{GetName, GetParent, GetUrl, TargetMessage};
 use crate::handler::PageInner;
-use crate::js::{Evaluation, EvaluationResult};
+use crate::js::{self, Evaluation, EvaluationResult};
 use crate::layout::Point;
 use crate::listeners::{EventListenerRequest, EventStream};
 use crate::{utils, ArcHttpRequest};
@@ -448,7 +447,7 @@ impl Page {
     pub async fn find_element(&self, selector: impl Into<String>) -> Result<Element> {
         let root = self.get_document().await?.node_id;
         let node_id = self.inner.find_element(selector, root).await?;
-        Element::new(Arc::clone(&self.inner), node_id).await
+        Element::new_with_node_id(Arc::clone(&self.inner), node_id).await
     }
 
     /// Return all `Element`s in the document that match the given selector
@@ -465,7 +464,7 @@ impl Page {
     pub async fn find_xpath(&self, selector: impl Into<String>) -> Result<Element> {
         self.get_document().await?;
         let node_id = self.inner.find_xpaths(selector).await?[0];
-        Element::new(Arc::clone(&self.inner), node_id).await
+        Element::new_with_node_id(Arc::clone(&self.inner), node_id).await
     }
 
     /// Return all `Element`s in the document that match the given xpath selector
@@ -1122,6 +1121,29 @@ impl Page {
     pub async fn execution_context(&self) -> Result<Option<ExecutionContextId>> {
         self.inner.execution_context().await
     }
+
+    //pub async fn import_function<A: js::import::Args, R: js::Js2Rust>(&self, function: impl Into<String>) -> js::import::Function<A, R> {
+    //    js::import::Function::new(self.inner.clone(), function)
+    //}
+
+    pub fn function(
+        &self,
+        function_declaration: impl Into<String>,
+    ) -> js::function::Function {
+        js::function::Function::new(
+            self.inner.clone(),
+            function_declaration
+        )
+    }
+
+    //pub fn callback<'a>(
+    //    &self,
+    //    name: impl Into<String>,
+    //    function: impl Fn() -> Result<()> + Send + Sync + 'a,
+    //) -> js::callback::Callback<'a> {
+    //    //js::callback::Callback::new(self.inner.clone(), name, function)
+    //    todo!()
+    //}
 
     /// Returns the secondary execution context identifier of this page that
     /// represents the context for JavaScript execution for manipulating the

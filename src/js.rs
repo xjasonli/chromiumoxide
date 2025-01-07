@@ -6,6 +6,15 @@ use chromiumoxide_cdp::cdp::js_protocol::runtime::{
 
 use crate::utils::is_likely_js_function;
 
+pub mod native;
+pub mod object;
+pub mod function;
+pub mod callback;
+
+pub use object::JsObject;
+pub use function::Function;
+pub use callback::Callback;
+
 #[derive(Debug, Clone)]
 pub struct EvaluationResult {
     /// Mirror object referencing original JavaScript object

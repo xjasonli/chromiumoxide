@@ -76,6 +76,8 @@ pub use crate::error::Result;
 pub use crate::fetcher::{BrowserFetcher, BrowserFetcherOptions};
 pub use crate::handler::Handler;
 pub use crate::page::Page;
+pub use serde::{Serialize, Deserialize};
+pub use schemars::JsonSchema;
 
 pub mod auth;
 pub mod browser;
