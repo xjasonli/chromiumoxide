@@ -9,7 +9,8 @@ use crate::cdp::js_protocol::runtime::{
 use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
 use super::JsObject;
-use super::{native::{FunctionNativeArgs, NativeValueFromJs, PageSeed}, object::OBJECT_ID_KEY};
+use super::{native::{FunctionNativeArgs, NativeValueFromJs}, object::OBJECT_ID_KEY};
+use super::de::PageSeed;
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 

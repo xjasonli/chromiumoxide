@@ -12,7 +12,7 @@ use crate::utils::evaluation_string;
 use crate::{error::Result, Page};
 use crate::handler::PageInner;
 use super::native::{CallbackNativeArgs, NativeValueFromJs, NativeValueIntoJs};
-use crate::js::native::PageSeed;
+use crate::js::de::PageSeed;
 
 #[cfg(feature = "tokio-runtime")]
 type Scope<'a, T = ()> = async_scoped::TokioScope<'a, T>;

@@ -10,6 +10,7 @@ pub mod native;
 pub mod object;
 pub mod function;
 pub mod callback;
+pub mod de;
 
 pub use object::JsObject;
 pub use function::Function;
