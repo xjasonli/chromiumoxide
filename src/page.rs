@@ -20,7 +20,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::target::{SessionId, TargetId};
 use chromiumoxide_cdp::cdp::js_protocol;
 use chromiumoxide_cdp::cdp::js_protocol::debugger::GetScriptSourceParams;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    AddBindingParams, CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId, RemoteObjectType, ScriptId
+    CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId, RemoteObjectType, ScriptId
 };
 use chromiumoxide_cdp::cdp::{browser_protocol, IntoEventKind};
 use chromiumoxide_types::*;
@@ -271,26 +271,6 @@ impl Page {
             .await?;
 
         Ok(EventStream::new(rx))
-    }
-
-    pub async fn expose_function(
-        &self,
-        name: impl Into<String>,
-        function: impl AsRef<str>,
-    ) -> Result<()> {
-        let name = name.into();
-        let expression = utils::evaluation_string(function, &["exposedFun", name.as_str()]);
-
-        self.execute(AddBindingParams::new(name)).await?;
-        self.execute(AddScriptToEvaluateOnNewDocumentParams::new(
-            expression.clone(),
-        ))
-        .await?;
-
-        // TODO add execution context tracking for frames
-        //let frames = self.frames().await?;
-
-        Ok(())
     }
 
     /// This resolves once the navigation finished and the page is loaded.
@@ -1122,28 +1102,86 @@ impl Page {
         self.inner.execution_context().await
     }
 
-    //pub async fn import_function<A: js::import::Args, R: js::Js2Rust>(&self, function: impl Into<String>) -> js::import::Function<A, R> {
-    //    js::import::Function::new(self.inner.clone(), function)
-    //}
-
-    pub fn function(
+    /// Declares a JavaScript function reference that can be used to make multiple calls.
+    /// 
+    /// This method creates a reusable function handle without immediately executing it.
+    /// The returned function object can be configured with additional context and arguments
+    /// before being called.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let func = page.declare_function("(x, y) => x + y");
+    /// let result = func.call((1, 2)).await?;
+    /// ```
+    pub fn declare_function(
         &self,
-        function_declaration: impl Into<String>,
+        function: impl Into<String>,
     ) -> js::function::Function {
         js::function::Function::new(
             self.inner.clone(),
-            function_declaration
+            function
         )
     }
 
-    //pub fn callback<'a>(
-    //    &self,
-    //    name: impl Into<String>,
-    //    function: impl Fn() -> Result<()> + Send + Sync + 'a,
-    //) -> js::callback::Callback<'a> {
-    //    //js::callback::Callback::new(self.inner.clone(), name, function)
-    //    todo!()
-    //}
+    /// Invokes a JavaScript function immediately with the given context and arguments.
+    /// 
+    /// This is a convenience method that combines `declare_function()` and `call()` into
+    /// a single operation. The function is executed exactly once.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let sum = page.invoke_function::<i32>(
+    ///     (),     // use default execution context
+    ///     "(x, y) => x + y",
+    ///     (1, 2)
+    /// ).await?;
+    /// ```
+    pub async fn invoke_function<R>(
+        &self,
+        context: impl Into<js::function::CallContext>,
+        function: impl Into<String>,
+        args: impl js::native::FunctionNativeArgs,
+    ) -> Result<R>
+    where
+        R: js::native::NativeValueFromJs,
+    {
+        self.declare_function(function)
+            .with_context(context)
+            .call(args)
+            .await
+    }
+
+    /// Exposes a Rust callback function to JavaScript code running in the page.
+    /// 
+    /// The exposed function can be called from JavaScript code and will execute the provided
+    /// Rust callback. The callback can be synchronous or asynchronous, and can return
+    /// values back to JavaScript.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// page.expose_function("myCallback", |x: i32| async move {
+    ///     Ok::<_, ()>(x + 1)
+    /// }).await?;
+    /// ```
+    pub async fn expose_function<'a, F, K, R, A>(
+        &self,
+        name: impl Into<String>,
+        function: F,
+    ) -> Result<js::callback::Callback<'a>>
+    where 
+        F: js::callback::CallbackAdapter<K, R, A> + 'a,
+        K: 'static,
+        R: js::native::NativeValueIntoJs + 'a,
+        A: js::native::CallbackNativeArgs + 'a,
+    {
+        js::callback::Callback::new(name.into(), self.clone(), function).await
+    }
 
     /// Returns the secondary execution context identifier of this page that
     /// represents the context for JavaScript execution for manipulating the
@@ -1268,6 +1306,10 @@ impl Page {
             .await?
             .result
             .script_source)
+    }
+
+    pub(crate) fn into_inner(self) -> Arc<PageInner> {
+        self.inner
     }
 }
 

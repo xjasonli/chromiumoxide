@@ -23,7 +23,7 @@ impl JsObject {
         self.page.clone().into()
     }
 
-    pub fn object_id(&self) -> &RemoteObjectId {
+    pub fn id(&self) -> &RemoteObjectId {
         &self.object_id
     }
 

@@ -9,6 +9,12 @@ use super::object::JsObject;
 use crate::handler::PageInner;
 
 
+pub trait NativeValueIntoJs: Serialize {}
+impl<T: Serialize> NativeValueIntoJs for T {}
+
+pub trait NativeValueFromJs: serde::de::DeserializeOwned + JsonSchema {}
+impl<T: serde::de::DeserializeOwned + JsonSchema> NativeValueFromJs for T {}
+
 pub trait FunctionNativeArgs {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error>;
 }
@@ -17,63 +23,69 @@ impl FunctionNativeArgs for () {
         Ok(vec![])
     }
 }
-impl<A1: NativeValueToJs> FunctionNativeArgs for (A1,) {
+impl<A1: NativeValueIntoJs> FunctionNativeArgs for (A1,) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs> FunctionNativeArgs for (A1, A2) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs> FunctionNativeArgs for (A1, A2) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs, A6: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs, A6: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?, serde_json::to_value(self.5)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs, A6: NativeValueToJs, A7: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs, A6: NativeValueIntoJs, A7: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?, serde_json::to_value(self.5)?, serde_json::to_value(self.6)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs, A6: NativeValueToJs, A7: NativeValueToJs, A8: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs, A6: NativeValueIntoJs, A7: NativeValueIntoJs, A8: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?, serde_json::to_value(self.5)?, serde_json::to_value(self.6)?, serde_json::to_value(self.7)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs, A6: NativeValueToJs, A7: NativeValueToJs, A8: NativeValueToJs, A9: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs, A6: NativeValueIntoJs, A7: NativeValueIntoJs, A8: NativeValueIntoJs, A9: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?, serde_json::to_value(self.5)?, serde_json::to_value(self.6)?, serde_json::to_value(self.7)?, serde_json::to_value(self.8)?])
     }
 }
-impl<A1: NativeValueToJs, A2: NativeValueToJs, A3: NativeValueToJs, A4: NativeValueToJs, A5: NativeValueToJs, A6: NativeValueToJs, A7: NativeValueToJs, A8: NativeValueToJs, A9: NativeValueToJs, A10: NativeValueToJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) {
+impl<A1: NativeValueIntoJs, A2: NativeValueIntoJs, A3: NativeValueIntoJs, A4: NativeValueIntoJs, A5: NativeValueIntoJs, A6: NativeValueIntoJs, A7: NativeValueIntoJs, A8: NativeValueIntoJs, A9: NativeValueIntoJs, A10: NativeValueIntoJs> FunctionNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) {
     fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
         Ok(vec![serde_json::to_value(self.0)?, serde_json::to_value(self.1)?, serde_json::to_value(self.2)?, serde_json::to_value(self.3)?, serde_json::to_value(self.4)?, serde_json::to_value(self.5)?, serde_json::to_value(self.6)?, serde_json::to_value(self.7)?, serde_json::to_value(self.8)?, serde_json::to_value(self.9)?])
     }
 }
 
-
-pub trait NativeValueToJs: Serialize {}
-impl<T: Serialize> NativeValueToJs for T {}
-
-pub trait NativeValueFromJs: serde::de::DeserializeOwned + JsonSchema {}
-impl<T: serde::de::DeserializeOwned + JsonSchema> NativeValueFromJs for T {}
+pub trait CallbackNativeArgs {}
+impl CallbackNativeArgs for () {}
+impl<A1: NativeValueFromJs> CallbackNativeArgs for (A1,) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs> CallbackNativeArgs for (A1, A2) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs, A6: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5, A6) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs, A6: NativeValueFromJs, A7: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5, A6, A7) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs, A6: NativeValueFromJs, A7: NativeValueFromJs, A8: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs, A6: NativeValueFromJs, A7: NativeValueFromJs, A8: NativeValueFromJs, A9: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9) {}
+impl<A1: NativeValueFromJs, A2: NativeValueFromJs, A3: NativeValueFromJs, A4: NativeValueFromJs, A5: NativeValueFromJs, A6: NativeValueFromJs, A7: NativeValueFromJs, A8: NativeValueFromJs, A9: NativeValueFromJs, A10: NativeValueFromJs> CallbackNativeArgs for (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) {}
 
 
 pub(super) struct PageSeed<T> {
@@ -310,18 +322,58 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
     fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
     where A: serde::de::EnumAccess<'de> {
+        struct VariantAccess<A> {
+            inner: A,
+            page: Arc<PageInner>,
+        }
+        impl<'de, A: serde::de::VariantAccess<'de>> serde::de::VariantAccess<'de> for VariantAccess<A> {
+            type Error = A::Error;
+
+            fn unit_variant(self) -> Result<(), Self::Error> {
+                self.inner.unit_variant()
+            }
+
+            fn newtype_variant_seed<T: serde::de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value, Self::Error> {
+                let seed = PageSeed::new(self.page.clone(), seed);
+                self.inner.newtype_variant_seed(seed)
+            }
+
+            fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+            where V: serde::de::Visitor<'de> {
+                self.inner.tuple_variant(len, PageVisitor {
+                    inner: visitor,
+                    page: self.page.clone(),
+                })
+            }
+
+            fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>
+            where V: serde::de::Visitor<'de> {
+                self.inner.struct_variant(fields, PageVisitor {
+                    inner: visitor,
+                    page: self.page.clone(),
+                })
+            }
+        }
+
         struct EnumAccess<A> {
             inner: A,
             page: Arc<PageInner>,
         }
         impl<'de, A: serde::de::EnumAccess<'de>> serde::de::EnumAccess<'de> for EnumAccess<A> {
             type Error = A::Error;
-            type Variant = A::Variant;
+            type Variant = VariantAccess<A::Variant>;
 
             fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
             where V: serde::de::DeserializeSeed<'de> {
                 let seed = PageSeed::new(self.page.clone(), seed);
-                self.inner.variant_seed(seed)
+                let (value, variant) = self.inner.variant_seed(seed)?;
+                Ok((
+                    value,
+                    VariantAccess {
+                        inner: variant,
+                        page: self.page.clone(),
+                    },
+                ))
             }
         }
 

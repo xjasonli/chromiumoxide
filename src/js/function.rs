@@ -8,21 +8,63 @@ use crate::cdp::js_protocol::runtime::{
 };
 use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
+use super::JsObject;
 use super::{native::{FunctionNativeArgs, NativeValueFromJs, PageSeed}, object::OBJECT_ID_KEY};
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 
-#[derive(Debug, Clone)]
-enum CallContext {
+#[derive(Default, Debug, Clone)]
+pub enum CallContext {
+    #[default]
+    Default,
     ExecutionContext(ExecutionContextId),
     Object(RemoteObjectId),
+}
+
+impl From<ExecutionContextId> for CallContext {
+    fn from(id: ExecutionContextId) -> Self {
+        Self::ExecutionContext(id)
+    }
+}
+impl From<RemoteObjectId> for CallContext {
+    fn from(id: RemoteObjectId) -> Self {
+        Self::Object(id)
+    }
+}
+impl From<&RemoteObjectId> for CallContext {
+    fn from(id: &RemoteObjectId) -> Self {
+        Self::Object(id.clone())
+    }
+}
+impl From<JsObject> for CallContext {
+    fn from(object: JsObject) -> Self {
+        Self::from(&object)
+    }
+}
+impl From<&JsObject> for CallContext {
+    fn from(object: &JsObject) -> Self {
+        Self::from(object.id())
+    }
+}
+impl From<()> for CallContext {
+    fn from(_: ()) -> Self {
+        Self::Default
+    }
+}
+impl From<Option<ExecutionContextId>> for CallContext {
+    fn from(execution_context_id: Option<ExecutionContextId>) -> Self {
+        match execution_context_id {
+            Some(id) => Self::from(id),
+            None => Self::Default,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Function {
     page: Arc<PageInner>,
     function_declaration: String,
-    context: Option<CallContext>,
+    context: CallContext,
 }
 
 impl Function {
@@ -30,7 +72,15 @@ impl Function {
         Self {
             page,
             function_declaration: function.into(),
-            context: None,
+            context: CallContext::Default,
+        }
+    }
+
+    pub fn with_context(self, context: impl Into<CallContext>) -> Self {
+        Self {
+            page: self.page,
+            function_declaration: self.function_declaration,
+            context: context.into(),
         }
     }
 
@@ -38,7 +88,7 @@ impl Function {
         Self {
             page: self.page,
             function_declaration: self.function_declaration,
-            context: Some(CallContext::Object(object.into())),
+            context: CallContext::Object(object.into()),
         }
     }
 
@@ -46,11 +96,11 @@ impl Function {
         Self {
             page: self.page,
             function_declaration: self.function_declaration,
-            context: Some(CallContext::ExecutionContext(execution_context.into())),
+            context: CallContext::ExecutionContext(execution_context.into()),
         }
     }
 
-    async fn call_impl(&self, args: Vec<JsonValue>, schema: Schema) -> Result<JsonValue> {
+    pub(super) async fn call_impl(&self, args: Vec<JsonValue>, schema: Schema) -> Result<JsonValue> {
         let function_declaration = REAL_FUNCTION.replace(
             "__FUNCTION__",
             self.function_declaration.as_str(),
@@ -63,13 +113,13 @@ impl Function {
             .build().unwrap();
         {
             match &self.context {
-                Some(CallContext::ExecutionContext(id)) => {
+                CallContext::ExecutionContext(id) => {
                     params.execution_context_id = Some(*id);
                 }
-                Some(CallContext::Object(id)) => {
+                CallContext::Object(id) => {
                     params.object_id = Some(id.clone());
                 }
-                None => {
+                CallContext::Default => {
                     let context_id = self.page
                         .execution_context()
                         .await?
@@ -96,7 +146,7 @@ impl Function {
             resp.result.object_id.ok_or(CdpError::NotFound)?
         };
 
-        let descriptor: ValueDescriptor = {
+        let descriptor: JsonDescriptor = {
             let params = CallFunctionOnParams::builder()
                 .function_declaration("function() { return this.descriptor; }")
                 .object_id(result_id.clone())
@@ -111,7 +161,7 @@ impl Function {
         };
 
         let json = if descriptor.paths.is_empty() {
-            descriptor.value
+            descriptor.json
         } else {
             let array_id = {
                 let params = CallFunctionOnParams::builder()
@@ -154,8 +204,8 @@ impl Function {
                 return Err(CdpError::NotFound);
             }
 
-            let mut object_ids = Vec::new();
-            object_ids.reserve(length);
+            let mut objects = Vec::new();
+            objects.reserve(length);
 
             for idx in 0..length {
                 let property_index = properties.iter().enumerate()
@@ -167,14 +217,10 @@ impl Function {
                     .ok_or(CdpError::NotFound)?
                     .object_id
                     .ok_or(CdpError::NotFound)?;
-                object_ids.push(RemoteObjectId::new(object_id));
+                objects.push(RemoteObjectId::new(object_id));
             }
 
-            JsonWithRemoteObjects {
-                json: descriptor.value,
-                object_paths: descriptor.paths,
-                object_ids,
-            }.into_json()
+            JsonWithRemoteObjects::new(descriptor, objects).into_json()
         };
 
         Ok(json)
@@ -227,7 +273,7 @@ const REAL_FUNCTION: &str = "async function() {
     const userFunction = (__FUNCTION__);
 
     var arguments = Array.from(arguments);
-    let { valueDescriptors, resultPatterns } = arguments.pop();
+    let { jsonDescriptors, resultPatterns } = arguments.pop();
 
     let mergeObject = function(value, path, object) {
         if (path.length === 0) {
@@ -282,27 +328,27 @@ const REAL_FUNCTION: &str = "async function() {
 
     let offset = 0;
     let args = [];
-    for (let i = 0; i < valueDescriptors.length; i++) {
-        const paths = valueDescriptors[i].paths;
+    for (let i = 0; i < jsonDescriptors.length; i++) {
+        const paths = jsonDescriptors[i].paths;
         for (let j = 0; j < paths.length; j++) {
             const path = paths[j];
             const object = arguments[offset + j];
-            valueDescriptors[i].value = mergeObject(valueDescriptors[i].value, path, object);
+            jsonDescriptors[i].json = mergeObject(jsonDescriptors[i].json, path, object);
             offset += 1;
         }
-        args.push(valueDescriptors[i].value);
+        args.push(jsonDescriptors[i].json);
     }
 
-    var value = await Promise.resolve(userFunction.apply(this, args));
+    var json = await Promise.resolve(userFunction.apply(this, args));
     let paths = [];
     let objects = [];
     for (let i = 0; i < resultPatterns.length; i++) {
         const pattern = resultPatterns[i];
-        value = splitObject(value, pattern, [], paths, objects);
+        json = splitObject(json, pattern, [], paths, objects);
     }
     return {
         descriptor: {
-            value: value,
+            json: json,
             paths: paths,
         },
         objects: objects,
@@ -310,25 +356,33 @@ const REAL_FUNCTION: &str = "async function() {
 }";
 
 #[derive(Debug)]
-pub struct JsonWithRemoteObjects {
-    json: JsonValue,
-    object_paths: Vec<JsonPath>,
-    object_ids: Vec<RemoteObjectId>,
+struct JsonWithRemoteObjects {
+    descriptor: JsonDescriptor,
+    objects: Vec<RemoteObjectId>,
 }
 
 impl JsonWithRemoteObjects {
-    fn from_json(mut json: JsonValue) -> Self {
-        let (object_paths, object_ids) = split_from_json(&mut json);
+    fn new(descriptor: JsonDescriptor, objects: Vec<RemoteObjectId>) -> Self {
         Self {
-            json,
-            object_paths,
-            object_ids,
+            descriptor,
+            objects,
+        }
+    }
+
+    fn from_json(mut json: JsonValue) -> Self {
+        let (paths, objects) = split_from_json(&mut json);
+        Self {
+            descriptor: JsonDescriptor {
+                json,
+                paths,
+            },
+            objects,
         }
     }
 
     fn into_json(mut self) -> JsonValue {
-        merge_into_json(&mut self.json, self.object_paths, self.object_ids);
-        self.json
+        merge_into_json(&mut self.descriptor.json, self.descriptor.paths, self.objects);
+        self.descriptor.json
     }
 
 }
@@ -409,15 +463,15 @@ fn merge_into_json(
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ValueDescriptor {
-    value: JsonValue,
-    paths: Vec<JsonPath>,
+pub(crate) struct JsonDescriptor {
+    pub json: JsonValue,
+    pub paths: Vec<JsonPath>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CallDescriptor {
-    value_descriptors: Vec<ValueDescriptor>,
+    json_descriptors: Vec<JsonDescriptor>,
     result_patterns: Vec<JsonPattern>,
 }
 
@@ -425,7 +479,7 @@ impl CallDescriptor {
     fn new(args: Vec<JsonValue>, schema: &Schema) -> (Self, Vec<RemoteObjectId>) {
         let patterns = parse_json_schema(&schema);
         let mut descriptor = Self {
-            value_descriptors: vec![],
+            json_descriptors: vec![],
             result_patterns: patterns,
         };
         let mut object_ids = Vec::new();
@@ -437,11 +491,8 @@ impl CallDescriptor {
 
     fn push(&mut self, arg: JsonValue) -> Vec<RemoteObjectId> {
         let json_with_remote_objects = JsonWithRemoteObjects::from_json(arg);
-        self.value_descriptors.push(ValueDescriptor {
-            value: json_with_remote_objects.json,
-            paths: json_with_remote_objects.object_paths,
-        });
-        json_with_remote_objects.object_ids
+        self.json_descriptors.push(json_with_remote_objects.descriptor);
+        json_with_remote_objects.objects
     }
 }
 
@@ -485,20 +536,25 @@ fn parse_json_schema(schema: &schemars::Schema) -> Vec<JsonPattern> {
             JsonValue::Object(obj) => {
                 match obj.get("type").unwrap_or(&default_null).as_str().unwrap_or_default() {
                     "array" => {
-                        let items = obj.get("items").unwrap_or(&default_null);
-                        if items.is_object() {
-                            let mut new_path = current.clone();
-                            new_path.push(JsonPatternSegment::Index(None));
-                            parse_impl(items, new_path, patterns);
-                        } else if items.is_array(){
-                            for (idx, item) in items.as_array().unwrap().iter().enumerate() {
+                        // https://json-schema.org/understanding-json-schema/reference/array
+                        let prefix_items = obj.get("prefixItems").unwrap_or(&default_null);
+                        if prefix_items.is_array() {
+                            for (idx, item) in prefix_items.as_array().unwrap().iter().enumerate() {
                                 let mut new_path = current.clone();
                                 new_path.push(JsonPatternSegment::Index(Some(idx)));
                                 parse_impl(item, new_path, patterns);
                             }
                         }
+
+                        let items = obj.get("items").unwrap_or(&default_null);
+                        if items.is_object() {
+                            let mut new_path = current.clone();
+                            new_path.push(JsonPatternSegment::Index(None));
+                            parse_impl(items, new_path, patterns);
+                        }
                     }
                     "object" => {
+                        // https://json-schema.org/understanding-json-schema/reference/object
                         let properties = obj.get("properties").unwrap_or(&default_null);
                         if properties.is_object() {
                             let properties = properties.as_object().unwrap();
@@ -513,6 +569,7 @@ fn parse_json_schema(schema: &schemars::Schema) -> Vec<JsonPattern> {
                                 parse_impl(val, new_path, patterns);
                             }
                         }
+
                         let additional_properties = obj.get("additionalProperties").unwrap_or(&default_null);
                         if additional_properties.is_boolean() {
                             let mut new_path = current.clone();
@@ -520,6 +577,8 @@ fn parse_json_schema(schema: &schemars::Schema) -> Vec<JsonPattern> {
                             parse_impl(additional_properties, new_path, patterns);
                         }
                     }
+                    // TODO: allOf/anyOf/oneOf
+                    // https://json-schema.org/understanding-json-schema/reference/combining
                     _ => {
                     }
                 }
