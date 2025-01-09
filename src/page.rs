@@ -1113,7 +1113,7 @@ impl Page {
     /// # use chromiumoxide::Page;
     /// # let page: Page = unimplemented!();
     /// let func = page.declare_function("(x, y) => x + y");
-    /// let result = func.call((1, 2)).await?;
+    /// let result: i32 = func.call((1, 2)).await?;
     /// ```
     pub fn declare_function(
         &self,
@@ -1134,9 +1134,19 @@ impl Page {
     /// ```no_run
     /// # use chromiumoxide::Page;
     /// # let page: Page = unimplemented!();
+    /// 
+    /// # let function = "(x, y) => x + y";
+    /// # let function = "function(x, y) { return x + y; }";
+    /// # let function = "function a(x, y) { return x + y; }";
+    /// # let function = "async function b(x, y) { return x + y; }";
+    /// # let function = "async (x, y) => x + y";
+    /// # let function = "window.func1";
+    /// # let function = "func1";
+    /// # let function = "this.func1";
+    /// 
     /// let sum = page.invoke_function::<i32>(
     ///     (),     // use default execution context
-    ///     "(x, y) => x + y",
+    ///     function,
     ///     (1, 2)
     /// ).await?;
     /// ```
