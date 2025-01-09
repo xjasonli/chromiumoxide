@@ -22,6 +22,7 @@ use async_once_cell::OnceCell;
 
 use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
+use crate::js::native::{FunctionNativeArgs, NativeValueFromJs};
 use crate::layout::{BoundingBox, BoxModel, ElementQuad, Point};
 use crate::utils;
 use crate::js::object::JsObject;
@@ -245,6 +246,31 @@ impl Element {
                 self.object.object_id.clone(),
             )
             .await
+    }
+
+    /// Invokes a JavaScript function immediately on the current element context.
+    /// 
+    /// This is a convenience method that delegates to the underlying JsObject's invoke_function.
+    /// The function is executed exactly once with the current element as `this` context.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Element;
+    /// # let element: Element = unimplemented!();
+    /// let text = element.invoke_function::<String>(
+    ///     "function() { return this.textContent; }",
+    ///     ()
+    /// ).await?;
+    /// ```
+    pub async fn invoke_function<R>(
+        &self,
+        function: impl Into<String>,
+        args: impl FunctionNativeArgs
+    ) -> Result<R>
+    where
+        R: NativeValueFromJs,
+    {
+        self.object.invoke_function(function, args).await
     }
 
     /// Returns a JSON representation of this element.

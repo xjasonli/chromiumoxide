@@ -7,7 +7,24 @@ use crate::cdp::js_protocol::runtime::RemoteObjectId;
 use crate::handler::PageInner;
 use crate::Page;
 use super::function::Function;
+use super::native::{FunctionNativeArgs, NativeValueFromJs};
+use crate::error::Result;
 
+/// Represents a JavaScript object in the browser's runtime.
+/// 
+/// This struct provides a handle to a remote JavaScript object, allowing interaction
+/// with objects in the browser's JavaScript context. It maintains a reference to both
+/// the object's unique identifier and the page context it belongs to.
+/// 
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::JsObject;
+/// # let obj: JsObject = unimplemented!();
+/// let name = obj.invoke_function::<String>(
+///     "function() { return this.name; }",
+///     ()
+/// ).await?;
+/// ```
 #[derive(Debug, Clone)]
 pub struct JsObject {
     pub(crate) object_id: RemoteObjectId,
@@ -15,21 +32,48 @@ pub struct JsObject {
 }
 
 impl JsObject {
+    /// Creates a new JsObject with the given remote object ID and page context.
     pub(crate) fn new(object_id: RemoteObjectId, page: Arc<PageInner>) -> Self {
         Self { object_id, page }
     }
 
+    /// Returns a reference to the page this object belongs to.
     pub fn page(&self) -> Page {
         self.page.clone().into()
     }
 
+    /// Returns the remote object identifier for this JavaScript object.
     pub fn id(&self) -> &RemoteObjectId {
         &self.object_id
     }
 
-    pub fn function(&self, function_declaration: impl Into<String>) -> Function {
-        Function::new(self.page.clone(), function_declaration.into())
+    /// Invokes a JavaScript function immediately on the current object context.
+    /// 
+    /// This is a convenience method that combines function declaration and invocation into
+    /// a single operation. The function is executed exactly once with the current object
+    /// as `this` context.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::JsObject;
+    /// # let obj: JsObject = unimplemented!();
+    /// let name = obj.invoke_function::<String>(
+    ///     "function() { return this.name; }",
+    ///     ()
+    /// ).await?;
+    /// ```
+    pub async fn invoke_function<R>(
+        &self,
+        function: impl Into<String>,
+        args: impl FunctionNativeArgs
+    ) -> Result<R>
+    where
+        R: NativeValueFromJs,
+    {
+        Function::new(self.page.clone(), function.into())
             .with_object(self.object_id.clone())
+            .call(args)
+            .await
     }
 }
 

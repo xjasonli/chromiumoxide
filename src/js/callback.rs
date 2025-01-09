@@ -18,12 +18,43 @@ type Scope<'a, T = ()> = async_scoped::TokioScope<'a, T>;
 #[cfg(feature = "async-std-runtime")]
 type Scope<'a, T = ()> = async_scoped::AsyncStdScope<'a, T>;
 
+/// Represents a JavaScript callback function that can be registered and invoked from the browser.
+/// 
+/// This struct provides a way to register Rust functions as JavaScript callbacks in the browser context.
+/// The callbacks can be invoked from JavaScript code and handle the communication between the browser
+/// and Rust environments.
+/// 
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::Page;
+/// # let page: Page = unimplemented!();
+/// let callback = Callback::new(
+///     "myCallback".to_string(),
+///     page,
+///     |x: i32| Ok(x + 1)
+/// ).await?;
+/// ```
 pub struct Callback<'a> {
     shared: Arc<Shared<'a>>,
     _scope: Scope<'a>,
 }
 
 impl<'a> Callback<'a> {
+    /// Creates a new callback with the given name, page context, and Rust function.
+    /// 
+    /// This method registers a Rust function as a JavaScript callback in the browser context.
+    /// The callback can then be invoked from JavaScript code running in the browser.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let callback = Callback::new(
+    ///     "myCallback".to_string(),
+    ///     page,
+    ///     |x: i32| Ok(x + 1)
+    /// ).await?;
+    /// ```
     pub(crate) async fn new<T, K, R, A>(name: String, page: Page, callback: T) -> Result<Self>
     where
         T: CallbackAdapter<K, R, A> + 'a,
@@ -66,6 +97,10 @@ impl<'a> Callback<'a> {
         Ok(Self { shared, _scope: scope })
     }
 
+    /// Returns the name of the callback as registered in the browser.
+    /// 
+    /// This method returns the string identifier that was used to register
+    /// the callback in the JavaScript environment.
     pub fn name(&self) -> &str {
         &self.shared.name
     }
@@ -77,13 +112,21 @@ impl<'a> std::fmt::Debug for Callback<'a> {
     }
 }
 
+/// Internal shared state for the callback implementation.
+/// 
+/// This struct holds the data needed to manage the callback's lifecycle
+/// and handle invocations from the browser.
 struct Shared<'a> {
+    /// The name of the callback as registered in JavaScript
     name: String,
+    /// The page context where the callback is registered
     page: Page,
+    /// The adapter that wraps the actual callback function
     adapter: BoxedAdapter<'a>,
 }
 
 impl<'a> Shared<'a> {
+    /// Runs the event loop that handles callback invocations from the browser.
     async fn run(self: Arc<Self>, listener: EventStream<EventBindingCalled>) {
         use futures::StreamExt as _;
         let mut listener = listener.fuse();

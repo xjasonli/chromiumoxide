@@ -13,69 +13,55 @@ use super::{native::{FunctionNativeArgs, NativeValueFromJs, PageSeed}, object::O
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 
-#[derive(Default, Debug, Clone)]
-pub enum CallContext {
-    #[default]
-    Default,
-    ExecutionContext(ExecutionContextId),
-    Object(RemoteObjectId),
-}
-
-impl From<ExecutionContextId> for CallContext {
-    fn from(id: ExecutionContextId) -> Self {
-        Self::ExecutionContext(id)
-    }
-}
-impl From<RemoteObjectId> for CallContext {
-    fn from(id: RemoteObjectId) -> Self {
-        Self::Object(id)
-    }
-}
-impl From<&RemoteObjectId> for CallContext {
-    fn from(id: &RemoteObjectId) -> Self {
-        Self::Object(id.clone())
-    }
-}
-impl From<JsObject> for CallContext {
-    fn from(object: JsObject) -> Self {
-        Self::from(&object)
-    }
-}
-impl From<&JsObject> for CallContext {
-    fn from(object: &JsObject) -> Self {
-        Self::from(object.id())
-    }
-}
-impl From<()> for CallContext {
-    fn from(_: ()) -> Self {
-        Self::Default
-    }
-}
-impl From<Option<ExecutionContextId>> for CallContext {
-    fn from(execution_context_id: Option<ExecutionContextId>) -> Self {
-        match execution_context_id {
-            Some(id) => Self::from(id),
-            None => Self::Default,
-        }
-    }
-}
-
-#[derive(Debug)]
+/// Represents a JavaScript function that can be executed in the browser's runtime.
+/// 
+/// This struct provides a way to declare and execute JavaScript functions in the browser context.
+/// It supports configuring the execution context and binding the function to specific objects
+/// before calling it.
+/// 
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::Page;
+/// # let page: Page = unimplemented!();
+/// let func = Function::new(page.into_inner(), "(x, y) => x + y")
+///     .with_context(execution_context_id)
+///     .call((1, 2))
+///     .await?;
+/// ```
+#[derive(Debug, Clone)]
 pub struct Function {
+    /// The page context where the function will be executed
     page: Arc<PageInner>,
+    /// The JavaScript function declaration as a string
     function_declaration: String,
+    /// The context configuration for function execution
     context: CallContext,
 }
 
 impl Function {
-    pub(crate) fn new(page: Arc<PageInner>, function: impl Into<String>) -> Self {
+    /// Creates a new Function with the given page context and function declaration.
+    pub(crate) fn new(page: Arc<PageInner>, function_declaration: impl Into<String>) -> Self {
         Self {
             page,
-            function_declaration: function.into(),
-            context: CallContext::Default,
+            function_declaration: function_declaration.into(),
+            context: CallContext::default(),
         }
     }
 
+    /// Sets the execution context for the function.
+    /// 
+    /// This method allows you to specify the context in which the function will be executed.
+    /// The context can be default, a specific execution context ID, or a JavaScript object.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let func = Function::new(page.into_inner(), "(x, y) => x + y")
+    ///     .with_context(execution_context_id)
+    ///     .call((1, 2))
+    ///     .await?;
+    /// ```
     pub fn with_context(self, context: impl Into<CallContext>) -> Self {
         Self {
             page: self.page,
@@ -84,6 +70,20 @@ impl Function {
         }
     }
 
+    /// Binds the function to a specific JavaScript object.
+    /// 
+    /// This method sets the `this` context of the function to the specified object.
+    /// It's useful when the function needs to be executed in the context of a particular object.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let func = Function::new(page.into_inner(), "function() { return this.value; }")
+    ///     .with_object(object_id)
+    ///     .call(())
+    ///     .await?;
+    /// ```
     pub fn with_object(self, object: impl Into<RemoteObjectId>) -> Self {
         Self {
             page: self.page,
@@ -92,12 +92,57 @@ impl Function {
         }
     }
 
+    /// Sets the function to run in a specific execution context.
+    /// 
+    /// This method allows you to specify which execution context the function should run in.
+    /// An execution context represents an isolated JavaScript environment.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let func = Function::new(page.into_inner(), "(x, y) => x + y")
+    ///     .with_execution_context(context_id)
+    ///     .call((1, 2))
+    ///     .await?;
+    /// ```
     pub fn with_execution_context(self, execution_context: impl Into<ExecutionContextId>) -> Self {
         Self {
             page: self.page,
             function_declaration: self.function_declaration,
             context: CallContext::ExecutionContext(execution_context.into()),
         }
+    }
+
+    /// Executes the function with the given arguments and returns the result.
+    /// 
+    /// This method executes the JavaScript function in the browser and converts the result
+    /// to a Rust type. It supports asynchronous operations and can handle complex argument
+    /// and return value types.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::Page;
+    /// # let page: Page = unimplemented!();
+    /// let sum: i32 = Function::new(page.into_inner(), "(x, y) => x + y")
+    ///     .call((1, 2))
+    ///     .await?;
+    /// ```
+    pub async fn call<R: NativeValueFromJs, A: FunctionNativeArgs>(
+        &self,
+        args: A,
+    ) -> Result<R, CdpError> {
+        let schema = {
+            let mut settings = schemars::generate::SchemaSettings::default();
+            settings.inline_subschemas = true;
+            settings.into_generator().into_root_schema_for::<R>()
+        };
+
+        let args = A::into_json_values(args)?;
+        let json = self.call_impl(args, schema).await?;
+        let seed = PageSeed::new(self.page.clone(), PhantomData);
+        let result = serde::de::DeserializeSeed::deserialize(seed, json)?;
+        Ok(result)
     }
 
     pub(super) async fn call_impl(&self, args: Vec<JsonValue>, schema: Schema) -> Result<JsonValue> {
@@ -225,49 +270,73 @@ impl Function {
 
         Ok(json)
     }
-
-    pub async fn call<R: NativeValueFromJs, A: FunctionNativeArgs>(
-        &self,
-        args: A,
-    ) -> Result<R, CdpError> {
-        let schema = {
-            let mut settings = schemars::generate::SchemaSettings::default();
-            settings.inline_subschemas = true;
-            settings.into_generator().into_root_schema_for::<R>()
-        };
-
-        let args = A::into_json_values(args)?;
-        let json = self.call_impl(args, schema).await?;
-        let seed = PageSeed::new(self.page.clone(), PhantomData);
-        let result = serde::de::DeserializeSeed::deserialize(seed, json)?;
-        Ok(result)
-    }
 }
 
-#[cfg(test)]
-mod tests {
-    #![allow(unused)]
-
-    use super::*;
-    use crate::error::Result;
-    use crate::js::object::JsObject;
-    use crate::JsonSchema;
-
-    #[derive(Serialize, Deserialize, JsonSchema)]
-    struct TestObject {
-        a: i32,
-        val: String,
-
-        obj: JsObject,
-    }
-
-    async fn test_function(func: Function, js_object: JsObject) -> Result<()> {
-        let result: Vec<TestObject> = func.call((&js_object, 5, "str_value", ["sfffff", "sdfsf"])).await?;
-
-        Ok(())
-    }
+/// Represents the execution context in which a JavaScript function will be called.
+/// 
+/// This enum defines three possible contexts for function execution:
+/// - `Default`: Uses the default execution context of the page
+/// - `ExecutionContext`: Uses a specific execution context identified by its ID
+/// - `Object`: Binds the function to a specific JavaScript object as its `this` context
+/// 
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::Page;
+/// # let page: Page = unimplemented!();
+/// let func = Function::new(page.into_inner(), "(x, y) => x + y")
+///     .with_context(CallContext::Default)
+///     .call((1, 2))
+///     .await?;
+/// ```
+#[derive(Default, Debug, Clone)]
+pub enum CallContext {
+    /// The default execution context of the page.
+    #[default]
+    Default,
+    /// A specific execution context identified by its ID.
+    ExecutionContext(ExecutionContextId),
+    /// A specific JavaScript object to be used as the `this` context.
+    Object(RemoteObjectId),
 }
 
+impl From<ExecutionContextId> for CallContext {
+    fn from(id: ExecutionContextId) -> Self {
+        Self::ExecutionContext(id)
+    }
+}
+impl From<RemoteObjectId> for CallContext {
+    fn from(id: RemoteObjectId) -> Self {
+        Self::Object(id)
+    }
+}
+impl From<&RemoteObjectId> for CallContext {
+    fn from(id: &RemoteObjectId) -> Self {
+        Self::Object(id.clone())
+    }
+}
+impl From<JsObject> for CallContext {
+    fn from(object: JsObject) -> Self {
+        Self::from(&object)
+    }
+}
+impl From<&JsObject> for CallContext {
+    fn from(object: &JsObject) -> Self {
+        Self::from(object.id())
+    }
+}
+impl From<()> for CallContext {
+    fn from(_: ()) -> Self {
+        Self::Default
+    }
+}
+impl From<Option<ExecutionContextId>> for CallContext {
+    fn from(execution_context_id: Option<ExecutionContextId>) -> Self {
+        match execution_context_id {
+            Some(id) => Self::from(id),
+            None => Self::Default,
+        }
+    }
+}
 
 const REAL_FUNCTION: &str = "async function() {
     const userFunction = (__FUNCTION__);

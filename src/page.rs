@@ -1117,11 +1117,11 @@ impl Page {
     /// ```
     pub fn declare_function(
         &self,
-        function: impl Into<String>,
+        function_declaration: impl Into<String>,
     ) -> js::function::Function {
         js::function::Function::new(
             self.inner.clone(),
-            function
+            function_declaration
         )
     }
 
