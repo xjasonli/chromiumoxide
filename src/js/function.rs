@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 use schemars::Schema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeSeed};
 use serde_json::Value as JsonValue;
 use crate::cdp::js_protocol::runtime::{
     CallArgument, CallFunctionOnParams, ExecutionContextId, GetPropertiesParams, RemoteObjectId
@@ -10,7 +10,7 @@ use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
 use super::JsObject;
 use super::{native::{FunctionNativeArgs, NativeValueFromJs}, object::OBJECT_ID_KEY};
-use super::de::PageSeed;
+use super::de::PageDeserializeSeed;
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 
@@ -141,8 +141,8 @@ impl Function {
 
         let args = A::into_json_values(args)?;
         let json = self.call_impl(args, schema).await?;
-        let seed = PageSeed::new(self.page.clone(), PhantomData);
-        let result = serde::de::DeserializeSeed::deserialize(seed, json)?;
+        let seed = PageDeserializeSeed::new(self.page.clone(), PhantomData);
+        let result = seed.deserialize(json)?;
         Ok(result)
     }
 

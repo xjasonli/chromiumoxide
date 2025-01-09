@@ -6,18 +6,18 @@ use super::object::JsObject;
 use crate::handler::PageInner;
 
 
-pub(super) struct PageSeed<T> {
+pub(super) struct PageDeserializeSeed<T> {
     page: Arc<PageInner>,
     inner: T,
 }
 
-impl<T> PageSeed<T> {
+impl<T> PageDeserializeSeed<T> {
     pub(crate) fn new(page: Arc<PageInner>, inner: T) -> Self {
         Self { page, inner }
     }
 }
 
-impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for PageSeed<T> {
+impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for PageDeserializeSeed<T> {
     type Value = T::Value;
 
     fn deserialize<D: serde::de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -33,20 +33,24 @@ impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> fo
     }
 }
 
+unsafe impl try_specialize::LifetimeFree for JsObject {}
+
+struct PageDeserializer<D> {
+    inner: D,
+    page: Arc<PageInner>,
+}
 
 macro_rules! impl_deserialize_method {
-    ($method:ident) => {
-        impl_deserialize_method!($method +);
-    };
-    
-    ($method:ident + $($name:ident: $type:ty),*) => {
+    ($method:ident $(($($name:ident: $type:ty),+))?) => {
         paste::paste! {
-            fn [< deserialize_ $method >]<V: serde::de::Visitor<'de>>(self, $($name: $type,)* visitor: V) -> Result<V::Value, Self::Error> {
+            fn [< deserialize_ $method >]<V: serde::de::Visitor<'de>>(self, $($($name: $type,)+)? visitor: V) -> Result<V::Value, Self::Error> {
                 if self.is_js_object::<V::Value>() {
                     self.deserialize_js_object()
                 } else {
                     self.inner.[< deserialize_ $method >](
-                        $($name,)*
+                        $(
+                            $($name,)*
+                        )?
                         PageVisitor {
                             inner: visitor,
                             page: self.page,
@@ -56,27 +60,6 @@ macro_rules! impl_deserialize_method {
             }
         }
     };
-}
-
-struct PageDeserializer<D> {
-    inner: D,
-    page: Arc<PageInner>,
-}
-
-impl<'de, D: serde::de::Deserializer<'de>> PageDeserializer<D> {
-    fn is_js_object<T>(&self) -> bool {
-        try_specialize::type_eq::<T, JsObject>()
-    }
-
-    fn deserialize_js_object<T>(self) -> Result<T, D::Error> {
-        assert!(self.is_js_object::<T>());
-
-        let proxy = super::object::JsObjectSerdeProxy::deserialize(self.inner)?;
-        let object_id: RemoteObjectId = proxy.into_inner().into();
-
-        let js_object = JsObject::new(object_id, self.page.clone());
-        Ok(try_specialize::TrySpecialize::try_specialize_from(js_object).unwrap())
-    }
 }
 
 impl<'de, D: serde::de::Deserializer<'de>> serde::de::Deserializer<'de> for PageDeserializer<D> {
@@ -104,22 +87,40 @@ impl<'de, D: serde::de::Deserializer<'de>> serde::de::Deserializer<'de> for Page
     impl_deserialize_method!(option);
     impl_deserialize_method!(unit);
     impl_deserialize_method!(map);
-    impl_deserialize_method!(unit_struct + name: &'static str);
-    impl_deserialize_method!(newtype_struct + name: &'static str);
+    impl_deserialize_method!(unit_struct(name: &'static str));
+    impl_deserialize_method!(newtype_struct(name: &'static str));
     impl_deserialize_method!(seq);
-    impl_deserialize_method!(tuple + len: usize);
-    impl_deserialize_method!(tuple_struct + name: &'static str, len: usize);
-    impl_deserialize_method!(struct + name: &'static str, fields: &'static [&'static str]);
-    impl_deserialize_method!(enum + name: &'static str, variants: &'static [&'static str]);
+    impl_deserialize_method!(tuple(len: usize));
+    impl_deserialize_method!(tuple_struct(name: &'static str, len: usize));
+    impl_deserialize_method!(struct(name: &'static str, fields: &'static [&'static str]));
+    impl_deserialize_method!(enum(name: &'static str, variants: &'static [&'static str]));
     impl_deserialize_method!(identifier);
     impl_deserialize_method!(ignored_any);
 }
 
+impl<'de, D: serde::de::Deserializer<'de>> PageDeserializer<D> {
+    fn is_js_object<T>(&self) -> bool {
+        try_specialize::type_eq::<T, JsObject>()
+    }
+
+    fn deserialize_js_object<T>(self) -> Result<T, D::Error> {
+        assert!(self.is_js_object::<T>());
+
+        let proxy = super::object::JsObjectSerdeProxy::deserialize(self.inner)?;
+        let object_id: RemoteObjectId = proxy.into_inner().into();
+
+        let js_object = JsObject::new(object_id, self.page.clone());
+        Ok(try_specialize::TrySpecialize::try_specialize_from(js_object).unwrap())
+    }
+}
+
+struct PageVisitor<V> {
+    inner: V,
+    page: Arc<PageInner>,
+}
+
 macro_rules! impl_visit_method {
-    ($method:ident) => {
-        impl_visit_method!($method + );
-    };
-    ($method:ident + $($name:ident: $type:ty $({ $($stmt:stmt)* })?)?) => {
+    ($method:ident$(($name:ident: $type:ty) $({ $($stmt:stmt)* })?)?) => {
         paste::paste! {
             fn [< visit_ $method >]<E>(self, $($name: $type)?) -> Result<Self::Value, E>
             where E: serde::de::Error {
@@ -129,12 +130,22 @@ macro_rules! impl_visit_method {
                 self.inner.[< visit_ $method >]($($name)?)
             }
         }
-    }
-}
-
-struct PageVisitor<V> {
-    inner: V,
-    page: Arc<PageInner>,
+    };
+    ($method:ident<$type:ty: $trait:ty>($name:ident : $type1:ty) -> $type2:ty $(;$( $stmt:tt )+)?) => {
+        paste::paste! {
+            fn [< visit_ $method >]<$type>(self, $name: $type1) -> Result<Self::Value, $type::Error>
+            where $type1: $trait {
+                $(
+                    $($stmt)+
+                )?
+                let $name = $type2 {
+                    inner: $name,
+                    page: self.page.clone(),
+                };
+                self.inner.[< visit_ $method >]($name)
+            }
+        }
+    };
 }
 
 impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V> {
@@ -144,36 +155,37 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
         self.inner.expecting(formatter)
     }
 
-    impl_visit_method!(bool + v: bool);
-    impl_visit_method!(i8 + v: i8);
-    impl_visit_method!(i16 + v: i16);
-    impl_visit_method!(i32 + v: i32);
-    impl_visit_method!(i64 + v: i64);
-    impl_visit_method!(u8 + v: u8);
-    impl_visit_method!(u16 + v: u16);
-    impl_visit_method!(u32 + v: u32);
-    impl_visit_method!(u64 + v: u64);
-    impl_visit_method!(f32 + v: f32);
-    impl_visit_method!(f64 + v: f64);
-    impl_visit_method!(char + v: char);
-    impl_visit_method!(str + v: &str);
-    impl_visit_method!(string + v: String);
-    impl_visit_method!(bytes + v: &[u8]);
-    impl_visit_method!(byte_buf + v: Vec<u8>);
     impl_visit_method!(none);
     impl_visit_method!(unit);
+    impl_visit_method!(bool(v: bool));
+    impl_visit_method!(i8(v: i8));
+    impl_visit_method!(i16(v: i16));
+    impl_visit_method!(i32(v: i32));
+    impl_visit_method!(i64(v: i64));
+    impl_visit_method!(i128(v: i128));
+    impl_visit_method!(u8(v: u8));
+    impl_visit_method!(u16(v: u16));
+    impl_visit_method!(u32(v: u32));
+    impl_visit_method!(u64(v: u64));
+    impl_visit_method!(u128(v: u128));
+    impl_visit_method!(f32(v: f32));
+    impl_visit_method!(f64(v: f64));
+    impl_visit_method!(char(v: char));
+    impl_visit_method!(str(v: &str));
+    impl_visit_method!(borrowed_str(v: &'de str));
+    impl_visit_method!(string(v: String));
+    impl_visit_method!(bytes(v: &[u8]));
+    impl_visit_method!(borrowed_bytes(v: &'de [u8]));
+    impl_visit_method!(byte_buf(v: Vec<u8>));
+    impl_visit_method!(
+        some<D: serde::de::Deserializer<'de>>(deserializer: D) -> PageDeserializer
+    );
+    impl_visit_method!(
+        newtype_struct<D: serde::de::Deserializer<'de>>(deserializer: D) -> PageDeserializer
+    );
+    impl_visit_method!(
+        seq<A: serde::de::SeqAccess<'de>>(seq: A) -> SeqAccess;
 
-    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where D: serde::de::Deserializer<'de> {
-        let deserializer = PageDeserializer {
-            inner: deserializer,
-            page: self.page.clone(),
-        };
-        self.inner.visit_some(deserializer)
-    }
-
-    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
-    where A: serde::de::SeqAccess<'de> {
         struct SeqAccess<A> {
             inner: A,
             page: Arc<PageInner>,
@@ -182,7 +194,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
             type Error = A::Error;
 
             fn next_element_seed<T: serde::de::DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error> {
-                let seed = PageSeed::new(self.page.clone(), seed);
+                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
                 self.inner.next_element_seed(seed)
             }
 
@@ -190,15 +202,10 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
                 self.inner.size_hint()
             }
         }
+    );
+    impl_visit_method!(
+        map<A: serde::de::MapAccess<'de>>(map: A) -> MapAccess;
 
-        self.inner.visit_seq(SeqAccess {
-            inner: seq,
-            page: self.page.clone(),
-        })
-    }
-
-    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-    where A: serde::de::MapAccess<'de> {
         struct MapAccess<A> {
             inner: A,
             page: Arc<PageInner>,
@@ -210,21 +217,17 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
                 self.inner.next_key_seed(seed)
             }
             fn next_value_seed<V: serde::de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {
-                let seed = PageSeed::new(self.page.clone(), seed);
+                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
                 self.inner.next_value_seed(seed)
             }
             fn size_hint(&self) -> Option<usize> {
                 self.inner.size_hint()
             }
         }
-        self.inner.visit_map(MapAccess {
-            inner: map,
-            page: self.page.clone(),
-        })
-    }
+    );
+    impl_visit_method!(
+        enum<A: serde::de::EnumAccess<'de>>(data: A) -> EnumAccess;
 
-    fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
-    where A: serde::de::EnumAccess<'de> {
         struct VariantAccess<A> {
             inner: A,
             page: Arc<PageInner>,
@@ -237,7 +240,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
             }
 
             fn newtype_variant_seed<T: serde::de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value, Self::Error> {
-                let seed = PageSeed::new(self.page.clone(), seed);
+                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
                 self.inner.newtype_variant_seed(seed)
             }
 
@@ -268,7 +271,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
             fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
             where V: serde::de::DeserializeSeed<'de> {
-                let seed = PageSeed::new(self.page.clone(), seed);
+                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
                 let (value, variant) = self.inner.variant_seed(seed)?;
                 Ok((
                     value,
@@ -279,12 +282,5 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
                 ))
             }
         }
-
-        self.inner.visit_enum(EnumAccess {
-            inner: data,
-            page: self.page.clone(),
-        })
-    }
+    );
 }
-
-unsafe impl try_specialize::LifetimeFree for JsObject {}

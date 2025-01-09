@@ -5,14 +5,14 @@ use rand::Rng;
 use schemars::Schema;
 use serde_json::Value as JsonValue;
 use std::marker::PhantomData;
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::DeserializeSeed};
 
 use crate::listeners::EventStream;
 use crate::utils::evaluation_string;
 use crate::{error::Result, Page};
 use crate::handler::PageInner;
 use super::native::{CallbackNativeArgs, NativeValueFromJs, NativeValueIntoJs};
-use crate::js::de::PageSeed;
+use crate::js::de::PageDeserializeSeed;
 
 #[cfg(feature = "tokio-runtime")]
 type Scope<'a, T = ()> = async_scoped::TokioScope<'a, T>;
@@ -355,8 +355,8 @@ macro_rules! impl_callback_adapter {
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageSeed::new(page_inner.clone(), PhantomData);
-                        let [< $ty:lower >] = serde::de::DeserializeSeed::deserialize(seed, json)?;
+                        let seed = PageDeserializeSeed::new(page_inner.clone(), PhantomData);
+                        let [< $ty:lower >] = seed.deserialize(json)?;
                     )*
 
                     let result = self($([< $ty:lower >],)*)?;
@@ -408,8 +408,8 @@ macro_rules! impl_callback_adapter_async {
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageSeed::new(page_inner.clone(), PhantomData);
-                        let [< $ty:lower >] = serde::de::DeserializeSeed::deserialize(seed, json)?;
+                        let seed = PageDeserializeSeed::new(page_inner.clone(), PhantomData);
+                        let [< $ty:lower >] = seed.deserialize(json)?;
                     )*
 
                     let result = self($([< $ty:lower >],)*).await?;
