@@ -454,7 +454,7 @@ fn random_string(len: usize) -> String {
 }
 
 async fn ensure_binding(page: &Page, name: &str) -> Result<()> {
-    #[derive(Deserialize, schemars::JsonSchema)]
+    #[derive(Debug, Deserialize, schemars::JsonSchema)]
     #[serde(rename_all = "camelCase")]
     #[allow(unused)]
     struct PropertyDescriptor {

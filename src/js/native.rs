@@ -150,11 +150,362 @@ impl<'de, D: serde::de::Deserializer<'de>> serde::de::Deserializer<'de> for Page
         }
     }
 
-    serde::forward_to_deserialize_any!(
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
-    );
+    fn deserialize_bool<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_bool(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_i8<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_i8(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_i16<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_i16(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_i32<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_i32(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_i64<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_i64(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_i128<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_i128(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_u8<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_u8(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_u16<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_u16(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_u32<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_u32(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_u64<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_u64(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_u128<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_u128(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_f32<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_f32(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_f64<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_f64(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_char<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_char(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_str<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_str(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_string<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_string(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_bytes<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_bytes(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_byte_buf<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_byte_buf(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_option<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_option(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_unit<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_unit(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_unit_struct<V: serde::de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_unit_struct(name, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_newtype_struct<V: serde::de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_newtype_struct(name, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_seq<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_seq(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_tuple<V: serde::de::Visitor<'de>>(
+        self,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_tuple(len, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_tuple_struct<V: serde::de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_tuple_struct(name, len, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_map<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_map(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_struct<V: serde::de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_struct(name, fields, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_enum<V: serde::de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_enum(name, variants, PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_identifier<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_identifier(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
+
+    fn deserialize_ignored_any<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        if self.is_js_object::<V::Value>() {
+            self.deserialize_js_object()
+        } else {
+            self.inner.deserialize_ignored_any(PageVisitor {
+                inner: visitor,
+                page: self.page,
+            })
+        }
+    }
 }
 
 
