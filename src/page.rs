@@ -1179,14 +1179,15 @@ impl Page {
     ///     Ok::<_, ()>(x + 1)
     /// }).await?;
     /// ```
-    pub async fn expose_function<'a, F, K, R, A>(
+    pub async fn expose_function<'a, F, K, E, R, A>(
         &self,
         name: impl Into<String>,
         function: F,
     ) -> Result<js::callback::Callback<'a>>
     where 
-        F: js::callback::CallbackAdapter<K, R, A> + 'a,
+        F: js::callback::CallbackAdapter<K, E, R, A> + 'a,
         K: 'static,
+        E: js::callback::JsError,
         R: js::native::NativeValueIntoJs + 'a,
         A: js::native::CallbackNativeArgs + 'a,
     {

@@ -56,10 +56,11 @@ impl<'a> Callback<'a> {
     ///     |x: i32| Ok(x + 1)
     /// ).await?;
     /// ```
-    pub(crate) async fn new<T, K, R, A>(name: String, page: Page, callback: T) -> Result<Self>
+    pub(crate) async fn new<T, K, E, R, A>(name: String, page: Page, callback: T) -> Result<Self>
     where
-        T: CallbackAdapter<K, R, A> + 'a,
+        T: CallbackAdapter<K, E, R, A> + 'a,
         K: 'static,
+        E: JsError,
         R: NativeValueIntoJs + 'a,
         A: CallbackNativeArgs + 'a,
     {
@@ -305,7 +306,7 @@ where
 }
 
 #[async_trait::async_trait]
-pub trait CallbackAdapter<K, R, A>: Send + Sync {
+pub trait CallbackAdapter<K, E, R, A>: Send + Sync {
     async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsErrorWrapper>;
     fn args_schema(&self) -> Schema;
 }
@@ -317,12 +318,12 @@ trait ErasedAdapter: Send + Sync {
 }
 type BoxedAdapter<'a> = Box<dyn ErasedAdapter + 'a>;
 
-struct WrappedAdapter<'a, K, R, A>(
-    Box<dyn CallbackAdapter<K, R, A> + 'a>
+struct WrappedAdapter<'a, K, E, R, A>(
+    Box<dyn CallbackAdapter<K, E, R, A> + 'a>
 );
 
 #[async_trait::async_trait]
-impl<'a, K, R, A> ErasedAdapter for WrappedAdapter<'a, K, R, A> {
+impl<'a, K, E, R, A> ErasedAdapter for WrappedAdapter<'a, K, E, R, A> {
     async fn call(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, JsErrorWrapper> {
         self.0.call(page.into(), args).await
     }
@@ -343,11 +344,11 @@ macro_rules! impl_callback_adapter {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<F, R, E, $($ty,)*> CallbackAdapter<CallKindSync, Result<R, E>, ($($ty,)*)> for F
+            impl<F, E, R, $($ty,)*> CallbackAdapter<CallKindSync, E, R, ($($ty,)*)> for F
             where
                 F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync,
-                R: NativeValueIntoJs,
                 E: JsError,
+                R: NativeValueIntoJs,
                 $( $ty: NativeValueFromJs,)*
             {
                 async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsErrorWrapper> {
@@ -395,12 +396,12 @@ macro_rules! impl_callback_adapter_async {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<F, Fut, R, E, $($ty,)*> CallbackAdapter<CallKindAsync, Result<R, E>, ($($ty,)*)> for F
+            impl<F, Fut, E, R, $($ty,)*> CallbackAdapter<CallKindAsync, E, R, ($($ty,)*)> for F
             where
                 F: (Fn($($ty,)*) -> Fut) + Send + Sync,
                 Fut: futures::Future<Output = Result<R, E>> + Send,
-                R: NativeValueIntoJs,
                 E: JsError,
+                R: NativeValueIntoJs,
                 $( $ty: NativeValueFromJs,)*
             {
                 async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsErrorWrapper> {
