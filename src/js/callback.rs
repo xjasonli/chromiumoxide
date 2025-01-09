@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use chromiumoxide_cdp::cdp::browser_protocol::page::AddScriptToEvaluateOnNewDocumentParams;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{AddBindingParams, EventBindingCalled, ExecutionContextId};
+use rand::Rng;
 use schemars::Schema;
 use serde_json::Value as JsonValue;
 use std::marker::PhantomData;
@@ -62,12 +63,11 @@ impl<'a> Callback<'a> {
         R: NativeValueIntoJs + 'a,
         A: CallbackNativeArgs + 'a,
     {
-        page.execute(
-            AddBindingParams::builder()
-                .name(&*CDP_BINDING_NAME)
-                .build()
-                .unwrap(),
-        ).await?;
+        ensure_binding(&page, &*CDP_BINDING_NAME).await?;
+
+        let listener = page
+            .event_listener::<EventBindingCalled>()
+            .await?;
 
         page.execute(
             AddScriptToEvaluateOnNewDocumentParams::builder()
@@ -76,10 +76,6 @@ impl<'a> Callback<'a> {
             .build().unwrap()
         ).await?;
 
-        let listener = page
-            .event_listener::<EventBindingCalled>()
-            .await?;
-
         let adapter = Box::new(WrappedAdapter(Box::new(callback)));
         let shared = Arc::new(Shared {
             name,
@@ -87,11 +83,13 @@ impl<'a> Callback<'a> {
             adapter,
         });
 
-        let (scope, _) = unsafe {
+        let (scope, _) = {
             let shared = shared.clone();
-            Scope::scope(move |s| {
-                s.spawn_cancellable(shared.run(listener), || ())
-            })
+            unsafe {
+                Scope::scope(move |s| {
+                    s.spawn_cancellable(shared.run(listener), || ())
+                })
+            }
         };
 
         Ok(Self { shared, _scope: scope })
@@ -444,7 +442,7 @@ impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
 impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 
 static CDP_BINDING_NAME: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    random_string(32)
+    random_string(rand::thread_rng().gen_range(30..50))
 });
 
 fn random_string(len: usize) -> String {
@@ -453,4 +451,57 @@ fn random_string(len: usize) -> String {
         .sample_iter::<char, _>(rand::distributions::Standard)
         .take(len)
         .collect()
+}
+
+async fn ensure_binding(page: &Page, name: &str) -> Result<()> {
+    #[derive(Deserialize, schemars::JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    #[allow(unused)]
+    struct PropertyDescriptor {
+        configurable: bool,
+        enumerable: bool,
+        writable: bool,
+        value: String,
+    }
+
+    let descriptor = page.invoke_function::<Option<PropertyDescriptor>>((),
+        "(name) => {
+            let descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+            if (descriptor) {
+                descriptor.value = typeof descriptor.value;
+                return descriptor;
+            }
+            return null;
+        }",
+        (name,)
+    ).await?;
+
+    let descriptor = if descriptor.is_none() || descriptor.as_ref().unwrap().value != "function" {
+        page.execute(
+            AddBindingParams::builder()
+                .name(name)
+                .build()
+                .unwrap(),
+        ).await?;
+        PropertyDescriptor {
+            configurable: true,
+            enumerable: true,
+            writable: true,
+            value: "function".to_string(),
+        }
+    } else {
+        descriptor.unwrap()
+    };
+
+    if descriptor.enumerable {
+        page.invoke_function::<()>((),
+            "(name) => {
+                Object.defineProperty(globalThis, name, {
+                    enumerable: false,
+                });
+            }",
+            (name,),
+        ).await?;
+    }
+    Ok(())
 }

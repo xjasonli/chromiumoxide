@@ -533,14 +533,18 @@ fn merge_into_json(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct JsonDescriptor {
+    #[serde(default)]
     pub json: JsonValue,
+    #[serde(default)]
     pub paths: Vec<JsonPath>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CallDescriptor {
+    #[serde(default)]
     json_descriptors: Vec<JsonDescriptor>,
+    #[serde(default)]
     result_patterns: Vec<JsonPattern>,
 }
 
