@@ -60,6 +60,7 @@
 //! [puppeteer](https://github.com/puppeteer/puppeteer)
 
 #![warn(missing_debug_implementations, rust_2018_idioms)]
+#![recursion_limit = "512"]
 
 use crate::handler::http::HttpRequest;
 use std::sync::Arc;
@@ -70,19 +71,22 @@ pub use chromiumoxide_types::{self as types, Binary, Command, Method, MethodType
 
 pub use crate::browser::{Browser, BrowserConfig};
 pub use crate::conn::Connection;
-pub use crate::element::Element;
+//pub use crate::element::Element;
 pub use crate::error::Result;
 #[cfg(feature = "fetcher")]
 pub use crate::fetcher::{BrowserFetcher, BrowserFetcherOptions};
 pub use crate::handler::Handler;
 pub use crate::page::Page;
+pub use serde::{Serialize, Deserialize};
+pub use schemars::JsonSchema;
+pub use js::*;
 
 pub mod auth;
 pub mod browser;
 pub mod cmd;
 pub mod conn;
 pub mod detection;
-pub mod element;
+//pub mod element;
 pub mod error;
 #[cfg(feature = "fetcher")]
 pub mod fetcher {

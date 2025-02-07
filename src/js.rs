@@ -1,10 +1,40 @@
 use serde::de::DeserializeOwned;
+use serde_json::Value as JsonValue;
 
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
     CallFunctionOnParams, EvaluateParams, RemoteObject,
 };
 
 use crate::utils::is_likely_js_function;
+
+pub(crate) mod helper;
+pub mod de;
+pub mod any;
+pub mod class;
+pub mod native_value;
+pub mod remote_object;
+pub mod bigint;
+pub mod expr;
+pub mod function;
+pub mod function_invoker;
+pub mod optional;
+pub mod undefined;
+pub mod exposed_function;
+pub mod execution_context;
+pub mod string_class;
+
+pub use any::*;
+pub use class::*;
+pub use native_value::*;
+pub use remote_object::*;
+pub use bigint::*;
+pub use expr::*;
+pub use function::*;
+pub use function_invoker::*;
+pub use optional::*;
+pub use undefined::*;
+pub use exposed_function::*;
+pub use execution_context::*;
 
 #[derive(Debug, Clone)]
 pub struct EvaluationResult {
@@ -19,6 +49,10 @@ impl EvaluationResult {
 
     pub fn object(&self) -> &RemoteObject {
         &self.inner
+    }
+
+    pub fn into_object(self) -> RemoteObject {
+        self.inner
     }
 
     pub fn value(&self) -> Option<&serde_json::Value> {
@@ -67,4 +101,77 @@ impl From<CallFunctionOnParams> for Evaluation {
     fn from(params: CallFunctionOnParams) -> Self {
         Evaluation::Function(params)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvalParams {
+    pub expr: String,
+    pub this: Option<JsRemoteObject>,
+    pub context: Option<ScopedExecutionContext>,
+    pub options: EvalOptions,
+}
+
+impl EvalParams {
+    pub fn new(expr: impl Into<String>) -> Self {
+        Self { expr: expr.into(), this: None, context: None, options: EvalOptions::default() }
+    }
+
+    pub fn with_this(self, this: Option<&JsRemoteObject>) -> Self {
+        Self { this: this.map(|t| t.clone()), ..self }
+    }
+
+    pub fn with_context(self, context: Option<ScopedExecutionContext>) -> Self {
+        Self { context, ..self }
+    }
+
+    pub fn with_options(self, options: EvalOptions) -> Self {
+        Self { options, ..self }
+    }
+}
+
+impl<T: Into<String>> From<T> for EvalParams {
+    fn from(expr: T) -> Self {
+        EvalParams::new(expr)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvalGlobalParams {
+    pub expr: String,
+    pub context: Option<ExecutionContext>,
+    pub options: EvalOptions,
+}
+
+impl EvalGlobalParams {
+    pub fn new(expr: impl Into<String>) -> Self {
+        Self { expr: expr.into(), context: None, options: EvalOptions::default() }
+    }
+
+    pub fn with_context(self, context: Option<ExecutionContext>) -> Self {
+        Self { context, ..self }
+    }
+
+    pub fn with_options(self, options: EvalOptions) -> Self {
+        Self { options, ..self }
+    }
+}
+
+impl<T: Into<String>> From<T> for EvalGlobalParams {
+    fn from(expr: T) -> Self {
+        EvalGlobalParams::new(expr)
+    }
+}
+
+#[macro_export]
+macro_rules! js {
+    ($($js:tt)+) => {
+        stringify!($($js)+)
+    }
+}
+pub use js;
+
+mod private {
+    pub trait Sealed {}
+    impl<'a, T: ?Sized + Sealed> Sealed for &'a T {}
+    impl<'a, T: ?Sized + Sealed> Sealed for &'a mut T {}
 }

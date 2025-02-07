@@ -1,0 +1,15 @@
+use super::*;
+
+define_js_remote_object!(
+    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakSet
+    class WeakSet extends Object {
+        static #subtype: "weakset";
+
+        properties: {
+            //TODO
+        }
+        methods: {
+            //TODO
+        }
+    }
+);

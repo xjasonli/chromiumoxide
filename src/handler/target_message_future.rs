@@ -10,14 +10,14 @@ use std::task::{Context, Poll};
 use crate::handler::target::TargetMessage;
 use crate::{error::Result, ArcHttpRequest};
 
-type TargetSender = mpsc::Sender<TargetMessage>;
+type TargetSender = mpsc::UnboundedSender<TargetMessage>;
 
 pin_project! {
     pub struct TargetMessageFuture<T> {
         #[pin]
         rx_request: oneshot::Receiver<T>,
         #[pin]
-        target_sender: mpsc::Sender<TargetMessage>,
+        target_sender: mpsc::UnboundedSender<TargetMessage>,
 
         message: Option<TargetMessage>,
     }

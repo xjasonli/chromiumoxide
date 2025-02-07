@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use futures::channel::mpsc::unbounded;
 use futures::channel::oneshot::channel as oneshot_channel;
 use futures::{stream, SinkExt, StreamExt};
 
@@ -20,23 +19,21 @@ use chromiumoxide_cdp::cdp::browser_protocol::target::{SessionId, TargetId};
 use chromiumoxide_cdp::cdp::js_protocol;
 use chromiumoxide_cdp::cdp::js_protocol::debugger::GetScriptSourceParams;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    AddBindingParams, CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId,
-    RemoteObjectType, ScriptId,
+    CallArgument, CallFunctionOnParams, EvaluateParams, ExecutionContextId, RemoteObjectType, ScriptId
 };
 use chromiumoxide_cdp::cdp::{browser_protocol, IntoEventKind};
 use chromiumoxide_types::*;
 
 use crate::auth::Credentials;
-use crate::element::Element;
 use crate::error::{CdpError, Result};
 use crate::handler::commandfuture::CommandFuture;
 use crate::handler::domworld::DOMWorldKind;
 use crate::handler::httpfuture::HttpFuture;
 use crate::handler::target::{GetName, GetParent, GetUrl, TargetMessage};
 use crate::handler::PageInner;
-use crate::js::{Evaluation, EvaluationResult};
+use crate::js::{self, Evaluation, EvaluationResult};
 use crate::layout::Point;
-use crate::listeners::{EventListenerRequest, EventStream};
+use crate::listeners::EventStream;
 use crate::{utils, ArcHttpRequest};
 
 #[derive(Debug, Clone)]
@@ -262,36 +259,7 @@ impl Page {
     /// # }
     /// ```
     pub async fn event_listener<T: IntoEventKind>(&self) -> Result<EventStream<T>> {
-        let (tx, rx) = unbounded();
-        self.inner
-            .sender()
-            .clone()
-            .send(TargetMessage::AddEventListener(
-                EventListenerRequest::new::<T>(tx),
-            ))
-            .await?;
-
-        Ok(EventStream::new(rx))
-    }
-
-    pub async fn expose_function(
-        &self,
-        name: impl Into<String>,
-        function: impl AsRef<str>,
-    ) -> Result<()> {
-        let name = name.into();
-        let expression = utils::evaluation_string(function, &["exposedFun", name.as_str()]);
-
-        self.execute(AddBindingParams::new(name)).await?;
-        self.execute(AddScriptToEvaluateOnNewDocumentParams::new(
-            expression.clone(),
-        ))
-        .await?;
-
-        // TODO add execution context tracking for frames
-        //let frames = self.frames().await?;
-
-        Ok(())
+        self.inner.event_listener::<T>().await
     }
 
     /// This resolves once the navigation finished and the page is loaded.
@@ -432,47 +400,58 @@ impl Page {
         Ok(self.inner.version().await?.user_agent)
     }
 
+    pub async fn get_window(&self) -> Result<js::JsWindow> {
+        self.eval("window").await
+    }
+
     /// Returns the root DOM node (and optionally the subtree) of the page.
     ///
     /// # Note: This does not return the actual HTML document of the page. To
     /// retrieve the HTML content of the page see `Page::content`.
-    pub async fn get_document(&self) -> Result<Node> {
-        let resp = self.execute(GetDocumentParams::default()).await?;
-        Ok(resp.result.root)
+    pub async fn get_document(&self) -> Result<js::JsDocument> {
+        self.eval("window.document").await
     }
 
     /// Returns the first element in the document which matches the given CSS
     /// selector.
     ///
     /// Execute a query selector on the document's node.
-    pub async fn find_element(&self, selector: impl Into<String>) -> Result<Element> {
-        let root = self.get_document().await?.node_id;
-        let node_id = self.inner.find_element(selector, root).await?;
-        Element::new(Arc::clone(&self.inner), node_id).await
+    pub async fn query_selector(
+        &self,
+        selector: impl Into<String>,
+    ) -> Result<Option<js::JsElement>> {
+        self.get_document().await?
+            .query_selector(&selector.into()).await
     }
 
     /// Return all `Element`s in the document that match the given selector
-    pub async fn find_elements(&self, selector: impl Into<String>) -> Result<Vec<Element>> {
-        let root = self.get_document().await?.node_id;
-        let node_ids = self.inner.find_elements(selector, root).await?;
-        Element::from_nodes(&self.inner, &node_ids).await
+    pub async fn query_selector_all(
+        &self,
+        selector: impl Into<String>,
+    ) -> Result<Vec<js::JsElement>> {
+        self.get_document().await?
+            .query_selector_all(&selector.into()).await
     }
 
     /// Returns the first element in the document which matches the given xpath
     /// selector.
     ///
     /// Execute a xpath selector on the document's node.
-    pub async fn find_xpath(&self, selector: impl Into<String>) -> Result<Element> {
-        self.get_document().await?;
-        let node_id = self.inner.find_xpaths(selector).await?[0];
-        Element::new(Arc::clone(&self.inner), node_id).await
+    pub async fn query_xpath(
+        &self,
+        selector: impl Into<String>,
+    ) -> Result<Option<js::JsNode>> {
+        self.get_document().await?
+            .query_xpath(&selector.into()).await
     }
 
     /// Return all `Element`s in the document that match the given xpath selector
-    pub async fn find_xpaths(&self, selector: impl Into<String>) -> Result<Vec<Element>> {
-        self.get_document().await?;
-        let node_ids = self.inner.find_xpaths(selector).await?;
-        Element::from_nodes(&self.inner, &node_ids).await
+    pub async fn query_xpath_all(
+        &self,
+        selector: impl Into<String>,
+    ) -> Result<Vec<js::JsNode>> {
+        self.get_document().await?
+            .query_xpath_all(&selector.into()).await
     }
 
     /// Describes node given its id
@@ -1123,6 +1102,214 @@ impl Page {
         self.inner.execution_context().await
     }
 
+    /// Execute JavaScript code in an anonymous scope.
+    ///
+    /// This method evaluates JavaScript code in an anonymous scope. Any declarations
+    /// (functions, classes, variables) will not be accessible after the evaluation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::page::Page;
+    /// # use chromiumoxide::error::Result;
+    /// # async fn demo(page: &Page) -> Result<()> {
+    /// // Function only exists within this evaluation
+    /// let result1 = page.eval("function add(a, b) { return a + b; }; add(1, 2)").await?;
+    /// // This would fail as the add function is no longer accessible
+    /// // let result2 = page.eval("add(3, 4)").await?; // Would throw ReferenceError
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    /// * `params` - JavaScript code or evaluation parameters to execute
+    ///
+    /// # Returns
+    /// Returns the result of evaluating the JavaScript code, converted to type `T`
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// * The JavaScript execution fails
+    /// * The result cannot be converted to type `T`
+    pub async fn eval<T: js::NativeValueFromJs>(
+        &self,
+        params: impl Into<js::EvalParams>,
+    ) -> Result<T> {
+        self.inner.eval(params).await
+    }
+
+    /// Execute JavaScript code in the global scope of the current page.
+    ///
+    /// This method evaluates JavaScript code directly in the global scope. Any declarations
+    /// (functions, classes, variables) will persist and be accessible in subsequent evaluations.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::page::Page;
+    /// # use chromiumoxide::error::Result;
+    /// # async fn demo(page: &Page) -> Result<()> {
+    /// // Define a function in global scope
+    /// let _ = page.eval_global("function add(a, b) { return a + b; }").await?;
+    /// // Use the previously defined function
+    /// let result = page.eval_global("add(1, 2)").await?;
+    /// 
+    /// // Define a class in global scope
+    /// let _ = page.eval_global("class MyClass { constructor(x) { this.x = x; } }").await?;
+    /// let instance = page.eval_global("new MyClass(42)").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    /// * `params` - JavaScript code or evaluation parameters to execute globally
+    ///
+    /// # Returns
+    /// Returns the result of evaluating the JavaScript code, converted to type `R`
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// * The JavaScript execution fails
+    /// * The result cannot be converted to type `R`
+    pub async fn eval_global<R: js::NativeValueFromJs>(
+        &self,
+        params: impl Into<js::EvalGlobalParams>,
+    ) -> Result<R> {
+        self.inner.eval_global(params).await
+    }
+
+    /// Creates a function invoker for executing JavaScript functions.
+    ///
+    /// This method provides a flexible way to create and execute JavaScript functions with arguments.
+    /// The function is compiled when created but not executed until explicitly invoked. This allows
+    /// for better control over function execution and argument passing.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::page::Page;
+    /// # use chromiumoxide::error::Result;
+    /// # use chromiumoxide::js::JsObject;
+    /// # async fn demo(page: &Page) -> Result<()> {
+    /// // Basic function invocation
+    /// let result = page.invoke_function(
+    ///     "(x) => x + 1",
+    ///     None,
+    /// ).await?
+    ///     .argument(1)?
+    ///     .invoke::<i32>()
+    ///     .await?;
+    /// assert_eq!(result, 2);
+    /// 
+    /// // Function with multiple arguments
+    /// let result = page.invoke_function(
+    ///     "(x, y) => x * y",
+    ///     None,
+    /// ).await?
+    ///     .argument(6)?
+    ///     .argument(7)?
+    ///     .invoke::<i32>()
+    ///     .await?;
+    /// assert_eq!(result, 42);
+    /// 
+    /// // Function with custom this context
+    /// let context: JsObject = page.eval("({ multiplier: 2 })").await?;
+    /// let result = page.invoke_function(
+    ///     "function(x) { return x * this.multiplier; }",
+    ///     Some(&context),
+    /// ).await?
+    ///     .argument(10)?
+    ///     .invoke::<i32>()
+    ///     .await?;
+    /// assert_eq!(result, 20);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    /// * `params` - JavaScript function code or evaluation parameters
+    /// * `this` - Optional object to use as `this` context when executing the function
+    ///
+    /// # Returns
+    /// Returns a `FunctionInvoker` that provides methods to:
+    /// * Add arguments with `argument()`
+    /// * Execute the function with `invoke()`
+    pub fn invoke_function(
+        &self,
+        params: impl Into<js::EvalParams>,
+        this: Option<&js::JsRemoteObject>,
+    ) -> js::FunctionInvoker {
+        self.inner.invoke_function(params, this)
+    }
+
+    /// Exposes a Rust function in the page's JavaScript context.
+    /// 
+    /// This method makes any compatible Rust function callable from JavaScript code.
+    /// The exposed function is registered as a property on the global object (`window`),
+    /// allowing seamless integration between Rust and JavaScript.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::page::Page;
+    /// # use chromiumoxide::error::Result;
+    /// # async fn demo(page: &Page) -> Result<()> {
+    /// // Expose a simple synchronous function
+    /// page.expose_function(
+    ///     "add",
+    ///     |a: i32, b: i32| -> Result<i32, std::convert::Infallible> {
+    ///         Ok(a + b)
+    ///     }
+    /// ).await?;
+    /// 
+    /// // Call it from JavaScript
+    /// let result = page.eval::<i32>("add(2, 3)").await?;
+    /// assert_eq!(result, 5);
+    /// 
+    /// // Expose an async function
+    /// page.expose_function(
+    ///     "fetchData",
+    ///     |url: String| -> Result<String, std::convert::Infallible> {
+    ///         Ok(format!("Data from {}", url))
+    ///     }
+    /// ).await?;
+    /// 
+    /// // Call async function from JavaScript
+    /// let data = page.eval::<String>("fetchData('example.com')").await?;
+    /// 
+    /// // Expose a function that handles complex types
+    /// page.expose_function(
+    ///     "processUser",
+    ///     |name: String, age: i32| -> Result<String, std::convert::Infallible> {
+    ///         Ok(format!("User {} is {} years old", name, age))
+    ///     }
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    /// * `name` - Name of the function as it will appear in JavaScript
+    /// * `function` - Any Rust function that can be called from JavaScript
+    ///
+    /// # Returns
+    /// Returns an `ExposedFunction` that represents the exposed function
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// * The function name is invalid
+    /// * The function cannot be exposed to JavaScript
+    pub async fn expose_function<'a, F, K, E, R, A>(
+        &self,
+        name: impl Into<String>,
+        function: F,
+    ) -> Result<js::ExposedFunction<'a>>
+    where 
+        F: js::CallbackAdapter<K, E, R, A> + 'a,
+        K: 'static,
+        E: js::JsCallbackError,
+        R: js::NativeValueIntoJs + 'a,
+        A: js::FunctionNativeArgsFromJs + 'a,
+    {
+        self.inner.expose_function(name.into(), function).await
+    }
+
     /// Returns the secondary execution context identifier of this page that
     /// represents the context for JavaScript execution for manipulating the
     /// DOM.
@@ -1246,6 +1433,10 @@ impl Page {
             .await?
             .result
             .script_source)
+    }
+
+    pub(crate) fn into_inner(self) -> Arc<PageInner> {
+        self.inner
     }
 }
 

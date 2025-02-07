@@ -1,21 +1,19 @@
 use std::sync::Arc;
 
-use futures::channel::mpsc::{channel, Receiver, Sender};
+use chromiumoxide_cdp::cdp::IntoEventKind;
+use futures::channel::mpsc::{unbounded, UnboundedSender, UnboundedReceiver};
 use futures::channel::oneshot::channel as oneshot_channel;
 use futures::stream::Fuse;
 use futures::{SinkExt, StreamExt};
 
 use chromiumoxide_cdp::cdp::browser_protocol::browser::{GetVersionParams, GetVersionReturns};
-use chromiumoxide_cdp::cdp::browser_protocol::dom::{
-    DiscardSearchResultsParams, GetSearchResultsParams, NodeId, PerformSearchParams,
-    QuerySelectorAllParams, QuerySelectorParams, Rgba,
-};
+use chromiumoxide_cdp::cdp::browser_protocol::dom::Rgba;
 use chromiumoxide_cdp::cdp::browser_protocol::emulation::{
     ClearDeviceMetricsOverrideParams, SetDefaultBackgroundColorOverrideParams,
     SetDeviceMetricsOverrideParams,
 };
 use chromiumoxide_cdp::cdp::browser_protocol::input::{
-    DispatchKeyEventParams, DispatchKeyEventType, DispatchMouseEventParams, DispatchMouseEventType,
+    DispatchMouseEventParams, DispatchMouseEventType,
     MouseButton,
 };
 use chromiumoxide_cdp::cdp::browser_protocol::page::{
@@ -23,7 +21,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::page::{
 };
 use chromiumoxide_cdp::cdp::browser_protocol::target::{ActivateTargetParams, SessionId, TargetId};
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    CallFunctionOnParams, CallFunctionOnReturns, EvaluateParams, ExecutionContextId, RemoteObjectId,
+    CallFunctionOnParams, EvaluateParams, ExecutionContextId,
 };
 use chromiumoxide_types::{Command, CommandResponse};
 
@@ -34,20 +32,21 @@ use crate::handler::domworld::DOMWorldKind;
 use crate::handler::httpfuture::HttpFuture;
 use crate::handler::target::{GetExecutionContext, TargetMessage};
 use crate::handler::target_message_future::TargetMessageFuture;
-use crate::js::EvaluationResult;
+use crate::js::{self, EvaluationResult};
 use crate::layout::Point;
+use crate::listeners::{EventListenerRequest, EventStream};
 use crate::page::ScreenshotParams;
-use crate::{keys, utils, ArcHttpRequest};
+use crate::{utils, ArcHttpRequest};
 
 #[derive(Debug)]
 pub struct PageHandle {
-    pub(crate) rx: Fuse<Receiver<TargetMessage>>,
+    pub(crate) rx: Fuse<UnboundedReceiver<TargetMessage>>,
     page: Arc<PageInner>,
 }
 
 impl PageHandle {
     pub fn new(target_id: TargetId, session_id: SessionId, opener_id: Option<TargetId>) -> Self {
-        let (commands, rx) = channel(1);
+        let (commands, rx) = unbounded();
         let page = PageInner {
             target_id,
             session_id,
@@ -70,13 +69,18 @@ pub(crate) struct PageInner {
     target_id: TargetId,
     session_id: SessionId,
     opener_id: Option<TargetId>,
-    sender: Sender<TargetMessage>,
+    sender: UnboundedSender<TargetMessage>,
 }
 
 impl PageInner {
     /// Execute a PDL command and return its response
     pub(crate) async fn execute<T: Command>(&self, cmd: T) -> Result<CommandResponse<T::Response>> {
-        execute(cmd, self.sender.clone(), Some(self.session_id.clone())).await
+        execute(cmd, self.sender.clone(), Some(self.session_id.clone()))?.await
+    }
+
+    pub(crate) async fn execute_no_wait<T: Command>(&self, cmd: T) -> Result<()> {
+        execute(cmd, self.sender.clone(), Some(self.session_id.clone()))
+            .map(|_fut| ())
     }
 
     /// Create a PDL command future
@@ -113,17 +117,20 @@ impl PageInner {
         &self.opener_id
     }
 
-    pub(crate) fn sender(&self) -> &Sender<TargetMessage> {
+    pub(crate) fn sender(&self) -> &UnboundedSender<TargetMessage> {
         &self.sender
     }
 
-    /// Returns the first element in the node which matches the given CSS
-    /// selector.
-    pub async fn find_element(&self, selector: impl Into<String>, node: NodeId) -> Result<NodeId> {
-        Ok(self
-            .execute(QuerySelectorParams::new(node, selector))
-            .await?
-            .node_id)
+    pub async fn event_listener<T: IntoEventKind>(&self) -> Result<EventStream<T>> {
+        let (tx, rx) = unbounded();
+        self.sender()
+            .clone()
+            .send(TargetMessage::AddEventListener(
+                EventListenerRequest::new::<T>(tx),
+            ))
+            .await?;
+
+        Ok(EventStream::new(rx))
     }
 
     /// Activates (focuses) the target.
@@ -136,46 +143,6 @@ impl PageInner {
     /// Version information about the browser
     pub async fn version(&self) -> Result<GetVersionReturns> {
         Ok(self.execute(GetVersionParams::default()).await?.result)
-    }
-
-    /// Return all `Element`s inside the node that match the given selector
-    pub(crate) async fn find_elements(
-        &self,
-        selector: impl Into<String>,
-        node: NodeId,
-    ) -> Result<Vec<NodeId>> {
-        Ok(self
-            .execute(QuerySelectorAllParams::new(node, selector))
-            .await?
-            .result
-            .node_ids)
-    }
-
-    /// Returns all elements which matches the given xpath selector
-    pub async fn find_xpaths(&self, query: impl Into<String>) -> Result<Vec<NodeId>> {
-        let perform_search_returns = self
-            .execute(PerformSearchParams {
-                query: query.into(),
-                include_user_agent_shadow_dom: Some(true),
-            })
-            .await?
-            .result;
-
-        let search_results = self
-            .execute(GetSearchResultsParams::new(
-                perform_search_returns.search_id.clone(),
-                0,
-                perform_search_returns.result_count,
-            ))
-            .await?
-            .result;
-
-        self.execute(DiscardSearchResultsParams::new(
-            perform_search_returns.search_id,
-        ))
-        .await?;
-
-        Ok(search_results.node_ids)
     }
 
     /// Moves the mouse to this point (dispatches a mouseMoved event)
@@ -216,76 +183,76 @@ impl PageInner {
         Ok(self)
     }
 
-    /// This simulates pressing keys on the page.
-    ///
-    /// # Note The `input` is treated as series of `KeyDefinition`s, where each
-    /// char is inserted as a separate keystroke. So sending
-    /// `page.type_str("Enter")` will be processed as a series of single
-    /// keystrokes:  `["E", "n", "t", "e", "r"]`. To simulate pressing the
-    /// actual Enter key instead use `page.press_key(
-    /// keys::get_key_definition("Enter").unwrap())`.
-    pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
-        for c in input.as_ref().split("").filter(|s| !s.is_empty()) {
-            self.press_key(c).await?;
-        }
-        Ok(self)
-    }
-
-    /// Uses the `DispatchKeyEvent` mechanism to simulate pressing keyboard
-    /// keys.
-    pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
-        let key = key.as_ref();
-        let key_definition = keys::get_key_definition(key)
-            .ok_or_else(|| CdpError::msg(format!("Key not found: {key}")))?;
-        let mut cmd = DispatchKeyEventParams::builder();
-
-        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L114-L115
-        // And https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L52
-        let key_down_event_type = if let Some(txt) = key_definition.text {
-            cmd = cmd.text(txt);
-            DispatchKeyEventType::KeyDown
-        } else if key_definition.key.len() == 1 {
-            cmd = cmd.text(key_definition.key);
-            DispatchKeyEventType::KeyDown
-        } else {
-            DispatchKeyEventType::RawKeyDown
-        };
-
-        cmd = cmd
-            .r#type(DispatchKeyEventType::KeyDown)
-            .key(key_definition.key)
-            .code(key_definition.code)
-            .windows_virtual_key_code(key_definition.key_code)
-            .native_virtual_key_code(key_definition.key_code);
-
-        self.execute(cmd.clone().r#type(key_down_event_type).build().unwrap())
-            .await?;
-        self.execute(cmd.r#type(DispatchKeyEventType::KeyUp).build().unwrap())
-            .await?;
-        Ok(self)
-    }
-
-    /// Calls function with given declaration on the remote object with the
-    /// matching id
-    pub async fn call_js_fn(
-        &self,
-        function_declaration: impl Into<String>,
-        await_promise: bool,
-        remote_object_id: RemoteObjectId,
-    ) -> Result<CallFunctionOnReturns> {
-        let resp = self
-            .execute(
-                CallFunctionOnParams::builder()
-                    .object_id(remote_object_id)
-                    .function_declaration(function_declaration)
-                    .generate_preview(true)
-                    .await_promise(await_promise)
-                    .build()
-                    .unwrap(),
-            )
-            .await?;
-        Ok(resp.result)
-    }
+//    /// This simulates pressing keys on the page.
+//    ///
+//    /// # Note The `input` is treated as series of `KeyDefinition`s, where each
+//    /// char is inserted as a separate keystroke. So sending
+//    /// `page.type_str("Enter")` will be processed as a series of single
+//    /// keystrokes:  `["E", "n", "t", "e", "r"]`. To simulate pressing the
+//    /// actual Enter key instead use `page.press_key(
+//    /// keys::get_key_definition("Enter").unwrap())`.
+//    pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
+//        for c in input.as_ref().split("").filter(|s| !s.is_empty()) {
+//            self.press_key(c).await?;
+//        }
+//        Ok(self)
+//    }
+//
+//    /// Uses the `DispatchKeyEvent` mechanism to simulate pressing keyboard
+//    /// keys.
+//    pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
+//        let key = key.as_ref();
+//        let key_definition = keys::get_key_definition(key)
+//            .ok_or_else(|| CdpError::msg(format!("Key not found: {key}")))?;
+//        let mut cmd = DispatchKeyEventParams::builder();
+//
+//        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L114-L115
+//        // And https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L52
+//        let key_down_event_type = if let Some(txt) = key_definition.text {
+//            cmd = cmd.text(txt);
+//            DispatchKeyEventType::KeyDown
+//        } else if key_definition.key.len() == 1 {
+//            cmd = cmd.text(key_definition.key);
+//            DispatchKeyEventType::KeyDown
+//        } else {
+//            DispatchKeyEventType::RawKeyDown
+//        };
+//
+//        cmd = cmd
+//            .r#type(DispatchKeyEventType::KeyDown)
+//            .key(key_definition.key)
+//            .code(key_definition.code)
+//            .windows_virtual_key_code(key_definition.key_code)
+//            .native_virtual_key_code(key_definition.key_code);
+//
+//        self.execute(cmd.clone().r#type(key_down_event_type).build().unwrap())
+//            .await?;
+//        self.execute(cmd.r#type(DispatchKeyEventType::KeyUp).build().unwrap())
+//            .await?;
+//        Ok(self)
+//    }
+//
+//    /// Calls function with given declaration on the remote object with the
+//    /// matching id
+//    pub async fn call_js_fn(
+//        &self,
+//        function_declaration: impl Into<String>,
+//        await_promise: bool,
+//        remote_object_id: RemoteObjectId,
+//    ) -> Result<CallFunctionOnReturns> {
+//        let resp = self
+//            .execute(
+//                CallFunctionOnParams::builder()
+//                    .object_id(remote_object_id)
+//                    .function_declaration(function_declaration)
+//                    .generate_preview(true)
+//                    .await_promise(await_promise)
+//                    .build()
+//                    .unwrap(),
+//            )
+//            .await?;
+//        Ok(resp.result)
+//    }
 
     pub async fn evaluate_expression(
         &self,
@@ -438,11 +405,75 @@ impl PageInner {
 
         Ok(utils::base64::decode(&res.data)?)
     }
+
+    pub async fn eval_global<R: js::NativeValueFromJs>(
+        self: &Arc<Self>,
+        params: impl Into<js::EvalGlobalParams>,
+    ) -> Result<R> {
+        let params = params.into();
+        js::helper::eval_global(
+            self.clone(),
+            params.expr,
+            params.context,
+            params.options
+        ).await
+    }
+
+    pub async fn eval<T: js::NativeValueFromJs>(
+        self: &Arc<Self>,
+        params: impl Into<js::EvalParams>,
+    ) -> Result<T> {
+        let params = params.into();
+        let evaluator = js::helper::Evaluator::new_expr(
+            self.clone(),
+            params.expr,
+            params.this,
+            params.context,
+            params.options
+        );
+        evaluator.eval().await
+    }
+
+    pub fn invoke_function(
+        self: &Arc<Self>,
+        params: impl Into<js::EvalParams>,
+        this: Option<&js::JsRemoteObject>,
+    ) -> js::FunctionInvoker {
+        let params = params.into();
+        let evaluator = js::helper::Evaluator::new_expr(
+            self.clone(),
+            params.expr,
+            params.this,
+            params.context,
+            params.options
+        );
+        evaluator.invoke(this)
+    }
+
+    pub async fn expose_function<'a, F, K, E, R, A>(
+        self: &Arc<Self>,
+        name: impl Into<String>,
+        function: F,
+    ) -> Result<js::ExposedFunction<'a>>
+    where 
+        F: js::CallbackAdapter<K, E, R, A> + 'a,
+        K: 'static,
+        E: js::JsCallbackError,
+        R: js::NativeValueIntoJs + 'a,
+        A: js::FunctionNativeArgsFromJs + 'a,
+    {
+        js::ExposedFunction::new(
+            name.into(),
+            self.clone(),
+            function
+        ).await
+    }
 }
 
-pub(crate) async fn execute<T: Command>(
+/*
+async fn execute<T: Command>(
     cmd: T,
-    mut sender: Sender<TargetMessage>,
+    mut sender: UnboundedSender<TargetMessage>,
     session: Option<SessionId>,
 ) -> Result<CommandResponse<T::Response>> {
     let (tx, rx) = oneshot_channel();
@@ -452,4 +483,22 @@ pub(crate) async fn execute<T: Command>(
     sender.send(TargetMessage::Command(msg)).await?;
     let resp = rx.await??;
     to_command_response::<T>(resp, method)
+}
+*/
+
+fn execute<T: Command>(
+    cmd: T,
+    mut sender: UnboundedSender<TargetMessage>,
+    session: Option<SessionId>,
+) -> Result<impl futures::Future<Output = Result<CommandResponse<T::Response>>>> {
+    let (tx, rx) = oneshot_channel();
+    let method = cmd.identifier();
+    let msg = CommandMessage::with_session(cmd, tx, session)?;
+
+    sender.start_send(TargetMessage::Command(msg))?;
+    let fut = async move {
+        let resp = rx.await??;
+        to_command_response::<T>(resp, method)
+    };
+    Ok(fut)
 }

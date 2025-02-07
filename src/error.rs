@@ -61,6 +61,9 @@ pub enum CdpError {
     JavascriptException(Box<ExceptionDetails>),
     #[error("{0}")]
     Url(#[from] url::ParseError),
+
+    #[error("{0}")]
+    UnexpectedValue(String),
 }
 impl CdpError {
     pub fn msg(msg: impl Into<String>) -> Self {

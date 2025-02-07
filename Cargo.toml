@@ -45,6 +45,22 @@ dunce = "1"
 bytes = { version = "1", features = ["serde"], optional = true }
 reqwest = { version = "0.12", default-features = false }
 
+# For function/callback support
+paste = "1"
+schemars = { version = "1.0.0-alpha.17", features = ["derive"] }
+try-specialize = "0.1"
+async-once-cell = "0.5"
+async-trait = "0.1"
+rand = "0.8"
+async-scoped = { version = "0.9" }
+erased-serde = "0.4"
+serde_repr = "0.1"
+serde-content = "0.1"
+bitflags = { version = "2", features = ["serde"] }
+frunk = "0.4"
+wildmatch = "2"
+
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 
@@ -57,8 +73,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 
 [features]
 default = ["async-std-runtime", "bytes"]
-async-std-runtime = ["async-std", "async-tungstenite/async-std-runtime"]
-tokio-runtime = ["tokio", "async-tungstenite/tokio-runtime"]
+async-std-runtime = ["async-std", "async-tungstenite/async-std-runtime", "async-scoped/use-async-std"]
+tokio-runtime = ["tokio", "async-tungstenite/tokio-runtime", "async-scoped/use-tokio"]
 fetcher = []
 bytes = ["dep:bytes"]
 serde0 = []
