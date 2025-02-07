@@ -17,6 +17,50 @@ pub use document_fragment::*;
 pub use character_data::*;
 pub use attr::*;
 
+// https://developer.mozilla.org/en-US/docs/Web/API/Node
+//
+// Node (nodeType = 1-12)
+// ├── Attr (nodeType = 2)
+// ├── Document (nodeType = 9)
+// │   ├── HTMLDocument
+// │   └── XMLDocument
+// ├── DocumentFragment (nodeType = 11)
+// ├── DocumentType (nodeType = 10)
+// ├── Element (nodeType = 1)
+// │   ├── HTMLElement
+// │   │   ├── HTMLAnchorElement (<a>)
+// │   │   ├── HTMLButtonElement (<button>)
+// │   │   ├── HTMLDivElement (<div>)
+// │   │   ├── HTMLFormElement (<form>)
+// │   │   ├── HTMLInputElement (<input>)
+// │   │   ├── HTMLImageElement (<img>)
+// │   │   ├── HTMLParagraphElement (<p>)
+// │   │   ├── HTMLSpanElement (<span>)
+// │   │   ├── HTMLTableElement (<table>)
+// │   │   ├── HTMLSelectElement (<select>)
+// │   │   ├── HTMLTextAreaElement (<textarea>)
+// │   │   ├── HTMLHeadingElement (<h1>-<h6>)
+// │   │   ├── HTMLListElement (<ul>, <ol>)
+// │   │   ├── HTMLMediaElement
+// │   │   │   ├── HTMLVideoElement
+// │   │   │   └── HTMLAudioElement
+// │   │   └── ... (other HTML elements)
+// │   ├── SVGElement
+// │   │   ├── SVGCircleElement
+// │   │   ├── SVGRectElement
+// │   │   ├── SVGPathElement
+// │   │   ├── SVGLineElement
+// │   │   ├── SVGTextElement
+// │   │   ├── SVGPolygonElement
+// │   │   ├── SVGEllipseElement
+// │   │   └── ... (other SVG elements)
+// │   └── MathMLElement
+// └── CharacterData (nodeType = 3)
+//     ├── Text (nodeType = 3)
+//     ├── Comment (nodeType = 8)
+//     ├── CDATASection (nodeType = 4)
+//     └── ProcessingInstruction (nodeType = 7)
+
 define_js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Node
     class Node extends Object {
@@ -76,18 +120,16 @@ define_js_remote_object!(
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild
-            appendChild(child: &JsNode) -> JsNode;
-            #[rename = appendChild2]
             appendChild<T: Class<JsNode>>(child: T) -> T::Owned;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
             cloneNode(deep: bool) -> JsNode;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition
-            compareDocumentPosition(other: &JsNode) -> JsDocumentPosition;
+            compareDocumentPosition<T: Class<JsNode>>(other: T) -> JsDocumentPosition;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/contains
-            contains(other: &JsNode) -> bool;
+            contains<T: Class<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode
             getRootNode(composed: bool) -> JsNode;
@@ -96,16 +138,19 @@ define_js_remote_object!(
             hasChildNodes() -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/insertBefore
-            insertBefore(new_node: &JsNode, reference_node: &JsNode) -> JsNode;
+            insertBefore<T1, T2>(new_node: T1, reference_node: T2) -> T1
+            where
+                T1: Class<JsNode>,
+                T2: Class<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isDefaultNamespace
             isDefaultNamespace(namespace_uri: &str) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isEqualNode
-            isEqualNode(other: &JsNode) -> bool;
+            isEqualNode<T: Class<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isSameNode
-            isSameNode(other: &JsNode) -> bool;
+            isSameNode<T: Class<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupNamespaceURI
             #[rename = lookup_namespace_uri]
@@ -118,10 +163,13 @@ define_js_remote_object!(
             normalize() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/removeChild
-            removeChild(child: &JsNode) -> JsNode;
+            removeChild<T: Class<JsNode>>(child: T) -> T;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild
-            replaceChild(new_child: &JsNode, old_child: &JsNode) -> JsNode;
+            replaceChild<T1, T2>(new_child: T1, old_child: T2) -> T1
+            where
+                T1: Class<JsNode>,
+                T2: Class<JsNode>;
         }
     }
 );
@@ -172,52 +220,6 @@ impl schemars::JsonSchema for JsDocumentPosition {
         gen.subschema_for::<u32>()
     }
 }
-
-/*
-Node (nodeType = 1-12)
-├── Attr (nodeType = 2)
-├── Document (nodeType = 9)
-│   ├── HTMLDocument
-│   └── XMLDocument
-├── DocumentFragment (nodeType = 11)
-├── DocumentType (nodeType = 10)
-├── Element (nodeType = 1)
-│   ├── HTMLElement
-│   │   ├── HTMLAnchorElement (<a>)
-│   │   ├── HTMLButtonElement (<button>)
-│   │   ├── HTMLDivElement (<div>)
-│   │   ├── HTMLFormElement (<form>)
-│   │   ├── HTMLInputElement (<input>)
-│   │   ├── HTMLImageElement (<img>)
-│   │   ├── HTMLParagraphElement (<p>)
-│   │   ├── HTMLSpanElement (<span>)
-│   │   ├── HTMLTableElement (<table>)
-│   │   ├── HTMLSelectElement (<select>)
-│   │   ├── HTMLTextAreaElement (<textarea>)
-│   │   ├── HTMLHeadingElement (<h1>-<h6>)
-│   │   ├── HTMLListElement (<ul>, <ol>)
-│   │   ├── HTMLMediaElement
-│   │   │   ├── HTMLVideoElement
-│   │   │   └── HTMLAudioElement
-│   │   └── ... (other HTML elements)
-│   ├── SVGElement
-│   │   ├── SVGCircleElement
-│   │   ├── SVGRectElement
-│   │   ├── SVGPathElement
-│   │   ├── SVGLineElement
-│   │   ├── SVGTextElement
-│   │   ├── SVGPolygonElement
-│   │   ├── SVGEllipseElement
-│   │   └── ... (other SVG elements)
-│   └── MathMLElement
-└── CharacterData (nodeType = 3)
-    ├── Text (nodeType = 3)
-    ├── Comment (nodeType = 8)
-    ├── CDATASection (nodeType = 4)
-    └── ProcessingInstruction (nodeType = 7)
-
- */
-
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

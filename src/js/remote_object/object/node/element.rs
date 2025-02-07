@@ -4,9 +4,11 @@ use crate::error::Result;
 
 mod html;
 mod svg;
+mod math_ml;
 
 pub use html::*;
 pub use svg::*;
+pub use math_ml::*;
 
 define_js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Element
