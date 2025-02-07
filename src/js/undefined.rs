@@ -1,5 +1,10 @@
+//! Rust representation of JavaScript's `undefined` value.
 use super::helper;
 
+/// Represents JavaScript's `undefined` value.
+/// 
+/// This type is used to represent the JavaScript `undefined` value in Rust code.
+/// It is primarily used for JavaScript interop within the ChromiumOxide library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct JsUndefined;
 

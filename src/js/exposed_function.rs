@@ -1,3 +1,29 @@
+//! Provides functionality for exposing Rust functions to JavaScript.
+//! 
+//! This module allows registering Rust functions that can be called from JavaScript code
+//! running in the browser. The exposed functions are added to the global scope (`window`)
+//! and can be called like regular JavaScript functions.
+//!
+//! # Example
+//! ```no_run
+//! # use chromiumoxide::page::Page;
+//! # use chromiumoxide::error::Result;
+//! # async fn example(page: &Page) -> Result<()> {
+//! // Expose a Rust function to JavaScript
+//! page.expose_function(
+//!     "add",
+//!     |a: i32, b: i32| -> Result<i32, std::convert::Infallible> {
+//!         Ok(a + b)
+//!     }
+//! ).await?;
+//!
+//! // Call it from JavaScript
+//! let result = page.eval::<i32>("add(2, 3)").await?;
+//! assert_eq!(result, 5);
+//! # Ok(())
+//! # }
+//! ```
+
 use std::sync::Arc;
 use chromiumoxide_cdp::cdp::browser_protocol::page::{AddScriptToEvaluateOnNewDocumentParams, RemoveScriptToEvaluateOnNewDocumentParams, ScriptIdentifier};
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{AddBindingParams, EventBindingCalled, ExecutionContextId};
@@ -21,9 +47,16 @@ type Scope<'a, T = ()> = async_scoped::TokioScope<'a, T>;
 #[cfg(feature = "async-std-runtime")]
 type Scope<'a, T = ()> = async_scoped::AsyncStdScope<'a, T>;
 
+/// Represents a Rust function that has been exposed to JavaScript.
+///
+/// This type manages the lifecycle of an exposed function, including:
+/// - Registration in the JavaScript environment
+/// - Handling function calls from JavaScript
+/// - Cleanup when the function is dropped
+///
+/// The function remains available in JavaScript until this object is dropped.
 pub struct ExposedFunction<'a> {
     shared: Arc<Shared<'a>>,
-    script_id: ScriptIdentifier,
     _scope: Scope<'a>,
 }
 
@@ -40,26 +73,32 @@ impl<'a> ExposedFunction<'a> {
         R: NativeValueIntoJs + 'a,
         A: FunctionNativeArgsFromJs + 'a,
     {
+        // Ensure the CDP binding is available
         ensure_binding(&page, &*CDP_BINDING_NAME).await?;
 
+        // Set up event listener for function calls
         let listener = page
             .event_listener::<EventBindingCalled>()
             .await?;
 
-        let script_id = page.execute(
+        // Register the function in JavaScript
+        let script = page.execute(
             AddScriptToEvaluateOnNewDocumentParams::builder()
             .source(add_function_script(&name, &*CDP_BINDING_NAME)?)
             .run_immediately(true)
             .build().unwrap()
         ).await?.result.identifier;
 
+        // Create the shared state
         let adapter = Box::new(WrappedAdapter(Box::new(callback)));
         let shared = Arc::new(Shared {
             name,
             page,
+            script,
             adapter,
         });
 
+        // Start the event handling scope
         let (scope, _) = {
             let shared = shared.clone();
             unsafe {
@@ -69,23 +108,21 @@ impl<'a> ExposedFunction<'a> {
             }
         };
 
-        Ok(Self { shared, script_id, _scope: scope })
+        Ok(Self { shared, _scope: scope })
     }
 
     /// Returns the name of the callback as registered in the browser.
-    /// 
-    /// This method returns the string identifier that was used to register
-    /// the callback in the JavaScript environment.
     pub fn name(&self) -> &str {
         &self.shared.name
     }
 }
 
+/// Automatically removes the function from JavaScript when dropped.
 impl<'a> Drop for ExposedFunction<'a> {
     fn drop(&mut self) {
         let _ = self.shared.page.execute_no_wait(
             RemoveScriptToEvaluateOnNewDocumentParams::builder()
-                .identifier(self.script_id.clone())
+                .identifier(self.shared.script.clone())
                 .build().unwrap()
         );
     }
@@ -108,6 +145,8 @@ struct Shared<'a> {
     page: Arc<PageInner>,
     /// The adapter that wraps the actual callback function
     adapter: BoxedAdapter<'a>,
+    /// The script identifier for the callback
+    script: ScriptIdentifier,
 }
 
 impl<'a> Shared<'a> {
@@ -128,6 +167,7 @@ impl<'a> Shared<'a> {
         }
     }
 
+    /// Handles a binding call event from the browser.
     async fn on_binding_called(&self, event: &EventBindingCalled) {
         if event.name != *CDP_BINDING_NAME {
             return;
@@ -167,6 +207,7 @@ impl<'a> Shared<'a> {
         }
     }
 
+    /// Invokes the callback with arguments from JavaScript.
     async fn invoke(&self, seq: u64, execution_context_id: ExecutionContextId) -> Result<JsonValue, JsCallbackErrorWrapper> {
         let args = get_arguments(
             self.page.clone(),
@@ -190,14 +231,17 @@ impl std::fmt::Debug for Shared<'_> {
     }
 }
 
+/// JavaScript code for function registration and invocation
 const ADD_FUNCTION: &str = include_str!("exposed_function/addFunction.js");
 const GET_ARGUMENTS: &str = include_str!("exposed_function/getArguments.js");
 const SET_RESULT: &str = include_str!("exposed_function/setResult.js");
 
+/// Creates the JavaScript code to register a function.
 fn add_function_script(name: &str, binding: &str) -> Result<String, serde_json::Error> {
     evaluation_string(ADD_FUNCTION, (name, binding))
 }
 
+/// Gets the arguments passed to a function call from JavaScript.
 async fn get_arguments(
     page: Arc<PageInner>,
     name: &str,
@@ -206,7 +250,7 @@ async fn get_arguments(
     schema: Schema,
 ) -> Result<Vec<JsonValue>> {
     let params = EvalParams::new(GET_ARGUMENTS)
-        .with_context(Some(ScopedExecutionContext::Id(execution_context_id.into())));
+        .context(execution_context_id);
 
     let JsonValue::Array(args) = page.invoke_function(params, None)
         .arguments((name, seq))?
@@ -217,6 +261,7 @@ async fn get_arguments(
     Ok(args)
 }
 
+/// Sets the result of a function call back to JavaScript.
 async fn set_result(
     page: Arc<PageInner>,
     name: &str,
@@ -226,7 +271,7 @@ async fn set_result(
     errmsg: Option<String>
 ) -> Result<()> {
     let params = EvalParams::new(SET_RESULT)
-        .with_context(Some(ScopedExecutionContext::Id(execution_context_id.into())));
+        .context(execution_context_id);
 
     page.invoke_function(params, None)
         .arguments((name, seq, result, errmsg))?
@@ -234,17 +279,21 @@ async fn set_result(
     Ok(())
 }
 
+/// Payload for callback invocations from JavaScript.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CallbackPayload {
     name: String,
     seq: u64,
 }
 
+/// Trait for errors that can be returned from JavaScript callbacks.
 pub trait JsCallbackError: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static {}
 impl<T: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static> JsCallbackError for T {}
 
+/// Wrapper type for JavaScript callback errors.
 #[derive(Debug)]
 pub struct JsCallbackErrorWrapper(Box<dyn JsCallbackError>);
+
 impl<T> From<T> for JsCallbackErrorWrapper
 where
     T: JsCallbackError
@@ -254,19 +303,23 @@ where
     }
 }
 
+/// Trait for adapting Rust functions to JavaScript callbacks.
 #[async_trait::async_trait]
 pub trait CallbackAdapter<K, E, R, A>: Send + Sync {
     async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper>;
     fn args_schema(&self) -> Schema;
 }
 
+/// Internal trait for type-erased callback adapters.
 #[async_trait::async_trait]
 trait ErasedAdapter: Send + Sync {
     async fn call(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper>;
     fn args_schema(&self) -> Schema;
 }
+
 type BoxedAdapter<'a> = Box<dyn ErasedAdapter + 'a>;
 
+/// Wrapper that adapts a concrete callback type to the erased trait.
 struct WrappedAdapter<'a, K, E, R, A>(
     Box<dyn CallbackAdapter<K, E, R, A> + 'a>
 );
@@ -281,10 +334,13 @@ impl<'a, K, E, R, A> ErasedAdapter for WrappedAdapter<'a, K, E, R, A> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct CallKindAsync;
+/// Marker type for synchronous callbacks.
 #[derive(Debug, Clone, Copy)]
 pub struct CallKindSync;
+
+/// Marker type for asynchronous callbacks.
+#[derive(Debug, Clone, Copy)]
+pub struct CallKindAsync;
 
 macro_rules! impl_callback_adapter {
     (

@@ -1,8 +1,8 @@
 use super::*;
 
-mod text;
-mod comment;
-mod processing_instruction;
+pub mod text;
+pub mod comment;
+pub mod processing_instruction;
 
 pub use text::*;
 pub use comment::*;

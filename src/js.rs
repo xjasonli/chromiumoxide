@@ -21,7 +21,6 @@ pub mod optional;
 pub mod undefined;
 pub mod exposed_function;
 pub mod execution_context;
-pub mod string_class;
 
 pub use any::*;
 pub use class::*;
@@ -116,15 +115,16 @@ impl EvalParams {
         Self { expr: expr.into(), this: None, context: None, options: EvalOptions::default() }
     }
 
-    pub fn with_this(self, this: Option<&JsRemoteObject>) -> Self {
-        Self { this: this.map(|t| t.clone()), ..self }
+    pub fn this<T: Class<JsRemoteObject>>(self, this: T) -> Self {
+        let this = Class::<JsRemoteObject>::as_ref(&this).clone();
+        Self { this: Some(this), ..self }
     }
 
-    pub fn with_context(self, context: Option<ScopedExecutionContext>) -> Self {
-        Self { context, ..self }
+    pub fn context<T: Into<ScopedExecutionContext>>(self, context: T) -> Self {
+        Self { context: Some(context.into()), ..self }
     }
 
-    pub fn with_options(self, options: EvalOptions) -> Self {
+    pub fn options(self, options: EvalOptions) -> Self {
         Self { options, ..self }
     }
 }
@@ -147,11 +147,11 @@ impl EvalGlobalParams {
         Self { expr: expr.into(), context: None, options: EvalOptions::default() }
     }
 
-    pub fn with_context(self, context: Option<ExecutionContext>) -> Self {
-        Self { context, ..self }
+    pub fn context<T: Into<ExecutionContext>>(self, context: T) -> Self {
+        Self { context: Some(context.into()), ..self }
     }
 
-    pub fn with_options(self, options: EvalOptions) -> Self {
+    pub fn options(self, options: EvalOptions) -> Self {
         Self { options, ..self }
     }
 }

@@ -1,3 +1,20 @@
+//! Types for representing JavaScript union types in Rust.
+//!
+//! This module provides the `AnyOf` type and related macros that allow representing
+//! JavaScript values that can be one of several different types. This is similar to
+//! TypeScript's union types (e.g., `string | number`).
+//!
+//! # Example
+//! ```no_run
+//! use chromiumoxide::js::AnyOf;
+//!
+//! // A value that can be either a string or a number
+//! type StringOrNumber = AnyOf!(String, i32);
+//!
+//! // A value that can be one of three types
+//! type ComplexType = AnyOf!(String, i32, bool);
+//! ```
+
 use std::borrow::Cow;
 use frunk::{
     Coprod,
@@ -11,6 +28,22 @@ use frunk::{
 };
 use super::*;
 
+/// Macro for creating union types using the `AnyOf` type.
+///
+/// This macro provides a convenient way to create types that can hold values
+/// of different types. It supports up to 20 different type parameters.
+///
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::js::AnyOf;
+/// // A value that can be either a string or a number
+/// let value: AnyOf!(String, i32) = AnyOf::new("hello");
+///
+/// // Check and extract the value
+/// if let Ok(string) = value.try_extract::<String, _, _>() {
+///     println!("Got string: {}", string);
+/// }
+/// ```
 #[macro_export]
 macro_rules! AnyOf {
     ($t1:ty, $t2:ty) => {
@@ -74,13 +107,27 @@ macro_rules! AnyOf {
 
 pub use AnyOf;
 
+/// Internal macro for defining AnyOf types.
+///
+/// This macro generates the implementation of an AnyOf type with the specified
+/// number of type parameters. It implements:
+/// - Constructor and accessor methods
+/// - Serialization and deserialization
+/// - JSON schema generation
 macro_rules! define_any_of {
     ($n:tt, $($t:ty),+) => {
         paste::paste! {
             type [< AnyOf $n Inner >]<$($t,)+> = Coprod!($($t),+);
+
+            /// A type that can hold a value of one of several different types.
+            ///
+            /// This type is used to represent JavaScript values that can be one of
+            /// multiple types, similar to TypeScript's union types.
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct [< AnyOf $n >]<$($t,)+>([< AnyOf $n Inner >]<$($t,)+>);
+
             impl<$($t,)+> [< AnyOf $n >]<$($t,)+> {
+                /// Creates a new instance containing the given value.
                 pub fn new<T, I>(value: T) -> Self
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoprodInjector<T, I>,
@@ -88,6 +135,7 @@ macro_rules! define_any_of {
                     Self(<[< AnyOf $n Inner >]<$($t,)+>>::inject(value))
                 }
                 
+                /// Gets a reference to the contained value if it is of type T.
                 pub fn get<T, I>(&self) -> Option<&T>
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoproductSelector<T, I>,
@@ -95,6 +143,7 @@ macro_rules! define_any_of {
                     self.0.get::<T, I>()
                 }
 
+                /// Sets the contained value.
                 pub fn set<T, I>(&mut self, value: T)
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoprodInjector<T, I>,
@@ -102,6 +151,7 @@ macro_rules! define_any_of {
                     self.0 = <[< AnyOf $n Inner >]<$($t,)+>>::inject(value);
                 }
 
+                /// Checks if the contained value is of type T.
                 pub fn is<T, I>(&self) -> bool
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoproductSelector<T, I>,
@@ -109,6 +159,7 @@ macro_rules! define_any_of {
                     self.0.get::<T, I>().is_some()
                 }
 
+                /// Takes ownership of the contained value if it is of type T.
                 pub fn take<T, I>(self) -> Option<T>
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoproductTaker<T, I>,
@@ -116,6 +167,8 @@ macro_rules! define_any_of {
                     self.0.take::<T, I>()
                 }
 
+                /// Attempts to extract a value of type T, returning the original
+                /// value if extraction fails.
                 pub fn try_extract<T, I, II>(self) -> Result<T, Self>
                 where
                     [< AnyOf $n Inner >]<$($t,)+>: CoprodUninjector<T, I>,
@@ -126,6 +179,7 @@ macro_rules! define_any_of {
                 }
             }
 
+            // Implement serialization
             impl<$($t,)+> serde::Serialize for [< AnyOf $n >]<$($t,)+>
             where
                 $($t: serde::Serialize),+
@@ -143,6 +197,7 @@ macro_rules! define_any_of {
                 }
             }
 
+            // Implement deserialization
             impl<'de, $($t,)+> serde::Deserialize<'de> for [< AnyOf $n >]<$($t,)+>
             where
                 $($t: serde::Deserialize<'de>),+
@@ -189,6 +244,7 @@ macro_rules! define_any_of {
                 }
             }
 
+            // Implement JSON schema generation
             impl<$($t,)+> schemars::JsonSchema for [< AnyOf $n >]<$($t,)+>
             where
                 $($t: schemars::JsonSchema),+
@@ -221,6 +277,7 @@ macro_rules! define_any_of {
     };
 }
 
+// Generate AnyOf types for different numbers of type parameters
 define_any_of!(2, T1, T2);
 define_any_of!(3, T1, T2, T3);
 define_any_of!(4, T1, T2, T3, T4);
@@ -241,17 +298,12 @@ define_any_of!(18, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, 
 define_any_of!(19, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19);
 define_any_of!(20, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20);
 
-
 #[cfg(test)]
 mod tests {
     #![allow(unused)]
     use super::*;
 
     fn test() {
-        //let any = <AnyOf!(i32, u32)>::new(1);
-        //let x = any.extract();
-        //println!("{:?}", x);
-
         let any = <AnyOf!(i32, String)>::new(1);
         let x: Result<i32, AnyOf2<i32, String>> = any.try_extract::<i32, _, _>();
         println!("{:?}", x.unwrap());

@@ -1,52 +1,186 @@
+//! Remote object types and traits for JavaScript interop.
+//! 
+//! This module provides types and traits for interacting with JavaScript objects through the Chrome DevTools Protocol.
+ 
 use std::{ops::Deref, sync::Arc};
 use serde::de::Error as _;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{ReleaseObjectParams, RemoteObjectId};
 use crate::{error::Result, handler::PageInner, js::de::PageDeserializer};
 use super::*;
 
-
-mod object;
-mod function;
-mod symbol;
+pub mod object;
+pub mod function;
+pub mod symbol;
 
 pub use object::*;
 pub use function::*;
 pub use symbol::*;
 
+/// A wrapper around JavaScript objects that allows interacting with them from Rust.
+/// 
+/// This type represents a remote JavaScript object that exists in the browser's JavaScript engine.
+/// It provides methods to:
+/// - Access object properties and methods
+/// - Evaluate JavaScript expressions in the context of this object
+/// - Invoke functions with this object as `this` context
+/// - Convert between JavaScript and Rust types
+///
+/// # Example
+/// ```no_run
+/// use chromiumoxide::js::JsRemoteObject;
+/// 
+/// # async fn example(obj: JsRemoteObject) {
+/// // Get a property
+/// let value = obj.get_property::<String>("propertyName").await?;
+/// 
+/// // Set a property
+/// obj.set_property("propertyName", "new value").await?;
+/// 
+/// // Invoke a method
+/// obj.invoke_method("methodName", Default::default())
+///    .argument(42)?
+///    .invoke::<String>()
+///    .await?;
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsRemoteObject(Arc<JsRemoteObjectInner>);
 
+/// Implementation of core functionality for JavaScript remote objects.
+/// 
+/// This implementation provides:
+/// - Object identification and type information
+/// - Type checking and downcasting
+/// - JavaScript evaluation and function invocation
 impl JsRemoteObject {
+    /// Returns the unique identifier of this remote object.
     pub fn object_id(&self) -> RemoteObjectId {
         self.0.data.id.clone()
     }
+
+    /// Returns the JavaScript type of this remote object.
     pub fn object_type(&self) -> &JsRemoteObjectType {
         &self.0.data.r#type
     }
+
+    /// Returns the JavaScript class name of this remote object.
+    /// 
+    /// For objects, this is typically the constructor name (e.g., "Array", "Object", "HTMLElement").
+    /// For functions, this is usually "Function".
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # fn example(obj: JsRemoteObject) {
+    /// match obj.object_class() {
+    ///     "Array" => println!("This is an array"),
+    ///     "HTMLElement" => println!("This is an HTML element"),
+    ///     _ => println!("Other type: {}", obj.object_class()),
+    /// }
+    /// # }
+    /// ```
     pub fn object_class(&self) -> &str {
         &self.0.data.class
     }
 
+    /// Checks if this object is an instance of the specified type.
+    /// 
+    /// This is similar to JavaScript's `instanceof` operator. It checks whether
+    /// the object matches the type constraints (type, subtype, and class name)
+    /// of the specified type.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # use chromiumoxide::js::JsElement;
+    /// # fn example(obj: JsRemoteObject) {
+    /// if obj.is::<JsElement>() {
+    ///     // This object is an HTML element
+    /// }
+    /// # }
+    /// ```
     pub fn is<T: Subclass<Self>>(&self) -> bool {
         T::is_instance(self)
     }
 
+    /// Attempts to downcast this object to a more specific type.
+    /// 
+    /// If the object matches the type constraints of the target type,
+    /// returns a new handle to the object as that type. Otherwise returns None.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # use chromiumoxide::js::JsElement;
+    /// # fn example(obj: JsRemoteObject) {
+    /// if let Some(element) = obj.downcast::<JsElement>() {
+    ///     // Use element-specific methods
+    ///     // element.query_selector(".class")...
+    /// }
+    /// # }
+    /// ```
     pub fn downcast<T: Subclass<Self>>(&self) -> Option<<T as Class<Self>>::Owned> {
         T::try_from_super(self.clone())
     }
 
+    /// Evaluates a JavaScript expression in the context of this object.
+    /// 
+    /// This method executes JavaScript code with `this` bound to the current object.
+    /// The expression result will be converted to the specified Rust type.
+    /// 
+    /// # Arguments
+    /// * `expr` - The JavaScript expression to evaluate
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// The result of evaluating the expression, converted to type `T`
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Get object's internal value
+    /// let value = obj.eval::<i32>("this.value * 2", Default::default()).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn eval<T: NativeValueFromJs>(
         &self,
         expr: impl Into<String>,
         options: EvalOptions
     ) -> Result<T> {
         let params = EvalParams::new(expr)
-            .with_this(Some(self))
-            .with_options(options);
+            .this(self)
+            .options(options);
 
         self.page().eval(params).await
     }
 
+    /// Creates a function invoker for executing JavaScript functions with this object as `this`.
+    /// 
+    /// This method allows executing JavaScript functions in the context of the current object.
+    /// The function can be specified either as a function object or as a string expression.
+    /// 
+    /// # Arguments
+    /// * `function` - The function to invoke, either as a `JsFunction` or string expression
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the function
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Call a function with arguments
+    /// let result = obj.invoke_function("(x, y) => x + y", Default::default())
+    ///     .argument(1)?
+    ///     .argument(2)?
+    ///     .invoke::<i32>()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn invoke_function(&self, function: impl Into<Function>, options: EvalOptions) -> FunctionInvoker {
         let function = function.into();
         let evaluator = match function {
@@ -66,11 +200,54 @@ impl JsRemoteObject {
         evaluator.invoke(Some(self))
     }
 
+    /// Invokes a method on this object.
+    /// 
+    /// This is a convenience wrapper around `invoke_function` that looks up a method by name
+    /// and invokes it with this object as `this`.
+    /// 
+    /// # Arguments
+    /// * `name` - The name of the method to invoke
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the method
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Call object's method
+    /// let result = obj.invoke_method("calculate", Default::default())
+    ///     .argument(42)?
+    ///     .invoke::<String>()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn invoke_method(&self, name: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
         let expr = format!("this['{}']", name.into());
         self.invoke_function(expr, options)
     }
 
+    /// Gets a property value from this object.
+    /// 
+    /// This method retrieves a property value by name and converts it to the specified Rust type.
+    /// 
+    /// # Arguments
+    /// * `name` - The name of the property to get
+    /// 
+    /// # Returns
+    /// The property value converted to type `T`
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// let title: String = obj.get_property("title").await?;
+    /// let count: i32 = obj.get_property("count").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn get_property<T>(&self, name: impl Into<String>) -> Result<T>
     where
         T: NativeValueFromJs,
@@ -79,6 +256,23 @@ impl JsRemoteObject {
         self.eval(expr, EvalOptions::default()).await
     }
 
+    /// Sets a property value on this object.
+    /// 
+    /// This method sets a property value by name, converting the Rust value to JavaScript.
+    /// 
+    /// # Arguments
+    /// * `name` - The name of the property to set
+    /// * `value` - The value to set, which must be convertible to JavaScript
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// obj.set_property("title", "New Title").await?;
+    /// obj.set_property("count", 42).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn set_property<T>(&self, name: impl Into<String>, value: T) -> Result<()>
     where
         T: NativeValueIntoJs,
@@ -143,6 +337,10 @@ impl Class<JsRemoteObject> for JsRemoteObject {
     fn as_ref(&self) -> &JsRemoteObject { self }
 }
 
+/// Internal storage for JsRemoteObject.
+/// 
+/// Contains the page reference and remote object data needed to interact with
+/// the JavaScript object in the browser.
 #[derive(Debug, Clone)]
 pub(crate) struct JsRemoteObjectInner {
     pub(crate) page: Arc<PageInner>,
@@ -157,6 +355,7 @@ impl PartialEq for JsRemoteObjectInner {
 }
 impl Eq for JsRemoteObjectInner {}
 
+/// Automatically releases the remote object when it is dropped.
 impl Drop for JsRemoteObjectInner {
     fn drop(&mut self) {
         let _ = self.page.execute_no_wait(
@@ -184,13 +383,13 @@ impl<'de> serde::Deserialize<'de> for JsRemoteObjectInner {
 
 impl schemars::JsonSchema for JsRemoteObjectInner {
     fn schema_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("JsRemoteValue")
+        std::borrow::Cow::Borrowed("JsRemoteObject")
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed(std::concat!(
             ::core::module_path!(),
             "::",
-            "JsRemoteValue"
+            "JsRemoteObject"
         ))
     }
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
@@ -198,12 +397,21 @@ impl schemars::JsonSchema for JsRemoteObjectInner {
     }
 }
 
+/// The type of a JavaScript remote object.
+/// 
+/// This represents the basic JavaScript type system categories:
+/// - Object (with optional subtypes for arrays, DOM nodes, etc)
+/// - Function
+/// - Symbol
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "type")]
 pub enum JsRemoteObjectType {
+    /// A JavaScript object, with an optional subtype for specific object kinds
     Object(Option<JsObjectSubtype>),
+    /// A JavaScript function
     Function,
+    /// A JavaScript symbol
     Symbol,
 }
 
@@ -234,46 +442,81 @@ impl JsRemoteObjectType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JsObjectTypeInfo {
-    #[serde(flatten)]
-    pub(crate) subtype: Option<JsObjectSubtype>,
-    pub(crate) class: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JsFunctionTypeInfo {
-    pub(crate) class: String,
-}
-
+/// Represents the subtype field of a Chrome DevTools Protocol RemoteObject.
+/// 
+/// This enum corresponds to the `subtype` field in CDP's RemoteObject type, which provides
+/// more specific type information for JavaScript objects. It includes:
+/// - Built-in JavaScript objects (Array, Date, RegExp)
+/// - DOM objects (Node with associated IDs)
+/// - Collection types (Map, Set, WeakMap, WeakSet)
+/// - Special objects (Promise, Proxy, Error)
+/// - Binary data objects (TypedArray, ArrayBuffer, DataView)
+/// - WebAssembly-related objects
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "subtype")]
 #[serde(rename_all = "lowercase")]
 pub enum JsObjectSubtype {
+    /// A JavaScript Array object
     Array,
+    
+    /// A DOM Node object with CDP-specific identifiers
+    /// 
+    /// Contains two types of node IDs used by CDP:
+    /// - `node_id`: ID for use with the DOM domain
+    /// - `backend_node_id`: Persistent backend node ID
     Node {
         #[serde(rename = "nodeId")]
         node_id: i64,
         #[serde(rename = "backendNodeId")]
         backend_node_id: i64,
     },
+
+    /// A JavaScript RegExp (Regular Expression) object
     RegExp,
+
+    /// A JavaScript Date object
     Date,
+
+    /// A JavaScript Map collection
     Map,
+
+    /// A JavaScript Set collection
     Set,
+
+    /// A JavaScript WeakMap collection
     WeakMap,
+
+    /// A JavaScript WeakSet collection
     WeakSet,
+
+    /// A JavaScript Iterator object
     Iterator,
+
+    /// A JavaScript Generator object
     Generator,
+
+    /// A JavaScript Error object or its subclasses
     Error,
+
+    /// A JavaScript Proxy object
     Proxy,
+
+    /// A JavaScript Promise object
     Promise,
+
+    /// A JavaScript TypedArray (Int8Array, Uint8Array, etc.)
     TypedArray,
+
+    /// A JavaScript ArrayBuffer object
     ArrayBuffer,
+
+    /// A JavaScript DataView object
     DataView,
+
+    /// A WebAssembly.Memory object
     WebAssemblyMemory,
+
+    /// A WebAssembly value type
     WasmValue,
 }
 
@@ -355,26 +598,6 @@ impl JsObjectSubtype {
         matches!(self, JsObjectSubtype::WasmValue)
     }
 }
-
-
-macro_rules! example {
-    (
-        $(#[$attrss:meta])*
-        $v:vis fn hello();
-    ) => {
-        $(#[$attrss])*
-        $v fn hello() {
-            println!("Hello, World!");
-        }
-    };
-}
-
-example! {
-    /// Says hello.
-    /// vsdf
-    pub fn hello();
-}
-
 
 
 macro_rules! define_js_properties {

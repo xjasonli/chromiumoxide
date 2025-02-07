@@ -3,12 +3,12 @@ use chromiumoxide_cdp::cdp::browser_protocol::dom::{BackendNodeId, NodeId};
 use super::*;
 use crate::error::{CdpError, Result};
 
-mod element;
-mod document;
-mod document_type;
-mod document_fragment;
-mod character_data;
-mod attr;
+pub mod element;
+pub mod document;
+pub mod document_type;
+pub mod document_fragment;
+pub mod character_data;
+pub mod attr;
 
 pub use element::*;
 pub use document::*;

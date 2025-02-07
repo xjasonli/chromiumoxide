@@ -1,6 +1,6 @@
 use super::*;
 
-mod cdata_section;
+pub mod cdata_section;
 pub use cdata_section::*;
 
 define_js_remote_object!(

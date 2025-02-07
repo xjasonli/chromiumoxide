@@ -1,6 +1,6 @@
 use super::*;
 
-mod shadow_root;
+pub mod shadow_root;
 
 pub use shadow_root::*;
 

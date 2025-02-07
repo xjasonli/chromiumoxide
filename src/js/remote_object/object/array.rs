@@ -1,10 +1,10 @@
 use super::*;
 
-mod arguments;
-mod array;
-mod dom_token_list;
-mod html_collection;
-mod node_list;
+pub mod arguments;
+pub mod array;
+pub mod dom_token_list;
+pub mod html_collection;
+pub mod node_list;
 
 pub use arguments::*;
 pub use array::*;

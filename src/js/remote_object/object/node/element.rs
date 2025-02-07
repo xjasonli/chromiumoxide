@@ -2,9 +2,9 @@ use super::*;
 use std::collections::HashMap;
 use crate::error::Result;
 
-mod html;
-mod svg;
-mod math_ml;
+pub mod html;
+pub mod svg;
+pub mod math_ml;
 
 pub use html::*;
 pub use svg::*;
