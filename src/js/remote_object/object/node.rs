@@ -138,7 +138,7 @@ define_js_remote_object!(
             hasChildNodes() -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/insertBefore
-            insertBefore<T1, T2>(new_node: T1, reference_node: T2) -> T1
+            insertBefore<T1, T2>(new_node: T1, reference_node: T2) -> JsNode
             where
                 T1: Class<JsNode>,
                 T2: Class<JsNode>;
@@ -163,10 +163,10 @@ define_js_remote_object!(
             normalize() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/removeChild
-            removeChild<T: Class<JsNode>>(child: T) -> T;
+            removeChild<T: Class<JsNode>>(child: T) -> T::Owned;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild
-            replaceChild<T1, T2>(new_child: T1, old_child: T2) -> T1
+            replaceChild<T1, T2>(new_child: T1, old_child: T2) -> JsNode
             where
                 T1: Class<JsNode>,
                 T2: Class<JsNode>;
