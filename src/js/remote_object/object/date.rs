@@ -1,7 +1,7 @@
 use super::*;
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
-define_js_remote_object!(
+js_remote_object!(
     class Date extends Object {
         static #subtype: "date";
 

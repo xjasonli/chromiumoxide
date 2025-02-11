@@ -6,7 +6,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallArgument, RemoteObjectId};
+use chromiumoxide_cdp::cdp::js_protocol::runtime::CallArgument;
 use schemars::Schema;
 
 use crate::handler::PageInner;
@@ -164,7 +164,7 @@ pub(crate) struct InvokeParams {
     pub(crate) arguments: Vec<JsonValue>,
 
     // Remote object references used in the call
-    pub(crate) remotes: Vec<RemoteObjectId>,
+    pub(crate) remotes: Vec<JsRemoteObject>,
 }
 
 impl InvokeParams {
@@ -172,7 +172,7 @@ impl InvokeParams {
     pub fn new(this: Option<JsRemoteObject>) -> Self {
         let mut remotes = vec![];
         if let Some(this) = &this {
-            remotes.push(this.object_id());
+            remotes.push(this.clone());
         }
         Self { this, arguments: vec![], remotes }
     }
@@ -207,7 +207,7 @@ impl InvokeParams {
     }
 
     /// Converts the parameters into CDP call arguments.
-    pub fn into_arguments(self, expr_list: &mut Vec<String>, remotes: &mut Vec<RemoteObjectId>) -> Result<Vec<CallArgument>> {
+    pub fn into_arguments(self, expr_list: &mut Vec<String>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
         let mut args = vec![];
 
         let mut descriptors = vec![];
@@ -225,7 +225,7 @@ impl InvokeParams {
             ..Default::default()
         });
         args.push(CallArgument{
-            object_id: self.this.map(|v| v.object_id()),
+            object_id: self.this.map(|v| v.remote_id()),
             ..Default::default()
         });
 

@@ -34,7 +34,7 @@ impl Evaluator {
         page: Arc<PageInner>,
         expr: impl Into<JsExpr>,
         this: Option<JsRemoteObject>,
-        context: Option<ScopedExecutionContext>,
+        context: Option<ExecutionContext>,
         options: EvalOptions,
     ) -> Self {
         Self::new(page, EvalTarget::Expr(
@@ -89,14 +89,14 @@ pub(crate) struct Expr {
     pub(crate) this: Option<JsRemoteObject>,
 
     // execution context for the expression
-    pub(crate) context: Option<ScopedExecutionContext>,
+    pub(crate) context: Option<ExecutionContext>,
 
 }
 impl Expr {
     pub fn new(
         expr: String,
         this: Option<JsRemoteObject>,
-        context: Option<ScopedExecutionContext>,
+        context: Option<ExecutionContext>,
     ) -> Self {
         Self { expr, this, context }
     }
@@ -127,7 +127,7 @@ impl EvalTarget {
     ) -> Result<CallFunctionOnParams> {
         let raw_params = match self {
             EvalTarget::Remote(remote) => {
-                let mut remotes = vec![remote.object_id()];
+                let mut remotes = vec![remote.clone()];
                 let mut expr_list = vec![];
 
                 let (func_args, expr_func) = if let Some(invoke) = invoke {
@@ -140,9 +140,9 @@ impl EvalTarget {
                     (func_args, expr_func)
                 };
                 let expr_this = CallArgument::builder()
-                    .object_id(remote.object_id())
+                    .object_id(remote.remote_id())
                     .build();
-                let context = Some(remote.object_id().into());
+                let context = Some(remote.into());
 
                 RawParams {
                     expr_func,
@@ -156,11 +156,11 @@ impl EvalTarget {
             EvalTarget::Expr(expr) => {
                 let mut remotes = vec![];
                 let mut expr_list = vec![];
-                if let Some(ScopedExecutionContext::ObjectId(id)) = &expr.context {
-                    remotes.push(id.clone());
+                if let Some(ExecutionContext::RemoteObject(remote_object)) = &expr.context {
+                    remotes.push(remote_object.clone());
                 }
                 if let Some(this) = &expr.this {
-                    remotes.push(this.object_id());
+                    remotes.push(this.clone());
                 }
 
                 let (func_args, expr_func) = if let Some(invoke) = invoke {
@@ -174,7 +174,7 @@ impl EvalTarget {
                 };
                 let expr_this = expr.this.as_ref().map(|this| {
                     CallArgument::builder()
-                        .object_id(this.object_id())
+                        .object_id(this.remote_id())
                         .build()
                 }).unwrap_or_default();
                 let context = expr.context;
@@ -197,8 +197,8 @@ struct RawParams {
     expr_list: Vec<String>,
     expr_this: CallArgument,
     func_args: Vec<CallArgument>,
-    context: Option<ScopedExecutionContext>,
-    remotes: Vec<RemoteObjectId>,
+    context: Option<ExecutionContext>,
+    remotes: Vec<JsRemoteObject>,
 }
 
 impl RawParams {
@@ -211,12 +211,12 @@ impl RawParams {
         let context = {
             if let Some(context) = self.context {
                 context
-            } else if let Some(object_id) = self.remotes.first() {
-                ScopedExecutionContext::ObjectId(object_id.clone())
+            } else if let Some(remote_object) = self.remotes.first() {
+                ExecutionContext::RemoteObject(remote_object.clone())
             } else {
                 let context_id = page.execution_context().await?
                     .ok_or_else(|| CdpError::msg("No execution context found"))?;
-                ScopedExecutionContext::Id(context_id)
+                ExecutionContext::Id(context_id)
             }
         };
 

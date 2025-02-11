@@ -3,7 +3,7 @@
 //! This module provides types that represent different ways to identify and scope
 //! JavaScript execution contexts when evaluating code in the browser.
 
-use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallFunctionOnParams, ExecutionContextId, RemoteObjectId};
+use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallFunctionOnParams, ExecutionContextId};
 use super::*;
 
 /// Represents a JavaScript execution context in the browser.
@@ -16,30 +16,30 @@ use super::*;
 /// - By its numeric ID (`ExecutionContextId`)
 /// - By a unique string identifier (`UniqueId`)
 #[derive(Debug, Clone)]
-pub enum ExecutionContext {
+pub enum GlobalExecutionContext {
     /// Identifies a context by its numeric ID
     Id(ExecutionContextId),
     /// Identifies a context by a unique string identifier
     UniqueId(String),
 }
 
-impl From<ExecutionContextId> for ExecutionContext {
+impl From<ExecutionContextId> for GlobalExecutionContext {
     fn from(id: ExecutionContextId) -> Self {
         Self::Id(id)
     }
 }
 
-impl From<String> for ExecutionContext {
+impl From<String> for GlobalExecutionContext {
     fn from(id: String) -> Self {
         Self::UniqueId(id)
     }
 }
 
-impl From<ExecutionContext> for ScopedExecutionContext {
-    fn from(context: ExecutionContext) -> Self {
+impl From<GlobalExecutionContext> for ExecutionContext {
+    fn from(context: GlobalExecutionContext) -> Self {
         match context {
-            ExecutionContext::Id(id) => ScopedExecutionContext::Id(id),
-            ExecutionContext::UniqueId(id) => ScopedExecutionContext::UniqueId(id),
+            GlobalExecutionContext::Id(id) => ExecutionContext::Id(id),
+            GlobalExecutionContext::UniqueId(id) => ExecutionContext::UniqueId(id),
         }
     }
 }
@@ -55,20 +55,20 @@ impl From<ExecutionContext> for ScopedExecutionContext {
 /// - By unique ID (execute in a named context)
 /// - By object ID (execute with a specific object as scope)
 #[derive(Debug, Clone)]
-pub enum ScopedExecutionContext {
+pub enum ExecutionContext {
     /// Execute in the context identified by this ID
     Id(ExecutionContextId),
     /// Execute in the context with this unique identifier
     UniqueId(String),
     /// Execute with this object as the scope
-    ObjectId(RemoteObjectId),
+    RemoteObject(JsRemoteObject),
 }
 
-impl ScopedExecutionContext {
+impl ExecutionContext {
     /// Returns the numeric context ID if this is an ID-based context
     pub fn id(&self) -> Option<ExecutionContextId> {
         match self {
-            ScopedExecutionContext::Id(id) => Some(id.clone()),
+            ExecutionContext::Id(id) => Some(id.clone()),
             _ => None,
         }
     }
@@ -76,54 +76,67 @@ impl ScopedExecutionContext {
     /// Returns the unique identifier if this is a name-based context
     pub fn unique_id(&self) -> Option<String> {
         match self {
-            ScopedExecutionContext::UniqueId(unique_id) => Some(unique_id.clone()),
+            ExecutionContext::UniqueId(unique_id) => Some(unique_id.clone()),
             _ => None,
         }
     }
 
     /// Returns the object ID if this is an object-scoped context
-    pub fn object_id(&self) -> Option<RemoteObjectId> {
+    pub fn remote_object(&self) -> Option<&JsRemoteObject> {
         match self {
-            ScopedExecutionContext::ObjectId(object_id) => Some(object_id.clone()),
+            ExecutionContext::RemoteObject(object) => Some(object),
             _ => None,
         }
     }
+
     pub(crate) fn apply(self, mut params: CallFunctionOnParams) -> CallFunctionOnParams {
         match self {
-            ScopedExecutionContext::Id(id) => params.execution_context_id = Some(id),
-            ScopedExecutionContext::UniqueId(unique_id) => params.unique_context_id = Some(unique_id),
-            ScopedExecutionContext::ObjectId(object_id) => params.object_id = Some(object_id),
+            ExecutionContext::Id(id) => params.execution_context_id = Some(id),
+            ExecutionContext::UniqueId(unique_id) => params.unique_context_id = Some(unique_id),
+            ExecutionContext::RemoteObject(remote_object) => params.object_id = Some(remote_object.remote_id()),
         }
         params
     }
 }
 
-impl From<&JsRemoteObject> for ScopedExecutionContext {
+impl From<&JsRemoteObject> for ExecutionContext {
     fn from(value: &JsRemoteObject) -> Self {
-        ScopedExecutionContext::ObjectId(value.object_id())
+        ExecutionContext::RemoteObject(value.clone())
     }
 }
 
-impl From<JsRemoteObject> for ScopedExecutionContext {
+impl From<JsRemoteObject> for ExecutionContext {
     fn from(value: JsRemoteObject) -> Self {
-        ScopedExecutionContext::ObjectId(value.object_id())
+        ExecutionContext::RemoteObject(value)
     }
 }
 
-impl From<RemoteObjectId> for ScopedExecutionContext {
-    fn from(object_id: RemoteObjectId) -> Self {
-        ScopedExecutionContext::ObjectId(object_id)
-    }
-}
-
-impl From<ExecutionContextId> for ScopedExecutionContext {
+impl From<ExecutionContextId> for ExecutionContext {
     fn from(id: ExecutionContextId) -> Self {
-        ScopedExecutionContext::Id(id)
+        ExecutionContext::Id(id)
     }
 }
 
-impl From<String> for ScopedExecutionContext {
+impl From<&ExecutionContextId> for ExecutionContext {
+    fn from(id: &ExecutionContextId) -> Self {
+        ExecutionContext::Id(*id)
+    }
+}
+
+impl From<String> for ExecutionContext {
     fn from(unique_id: String) -> Self {
-        ScopedExecutionContext::UniqueId(unique_id)
+        ExecutionContext::UniqueId(unique_id)
+    }
+}
+
+impl From<&String> for ExecutionContext {
+    fn from(unique_id: &String) -> Self {
+        ExecutionContext::UniqueId(unique_id.clone())
+    }
+}
+
+impl From<&str> for ExecutionContext {
+    fn from(unique_id: &str) -> Self {
+        ExecutionContext::UniqueId(unique_id.to_string())
     }
 }

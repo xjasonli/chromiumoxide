@@ -1,6 +1,6 @@
 use super::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Attr
     class Attr extends Node inherits Object {
         static #class: "Attr";

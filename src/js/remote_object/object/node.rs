@@ -1,5 +1,50 @@
-use chromiumoxide_cdp::cdp::browser_protocol::dom::{BackendNodeId, NodeId};
+//! [DOM Node](https://developer.mozilla.org/en-US/docs/Web/API/Node) type hierarchy
+//!
+//! ```text
+//! Node (nodeType = 1-12)
+//! ├── Attr (nodeType = 2)
+//! ├── Document (nodeType = 9)
+//! │   ├── HTMLDocument
+//! │   └── XMLDocument
+//! ├── DocumentFragment (nodeType = 11)
+//! ├── DocumentType (nodeType = 10)
+//! ├── Element (nodeType = 1)
+//! │   ├── HTMLElement
+//! │   │   ├── HTMLAnchorElement (<a>)
+//! │   │   ├── HTMLButtonElement (<button>)
+//! │   │   ├── HTMLDivElement (<div>)
+//! │   │   ├── HTMLFormElement (<form>)
+//! │   │   ├── HTMLInputElement (<input>)
+//! │   │   ├── HTMLImageElement (<img>)
+//! │   │   ├── HTMLParagraphElement (<p>)
+//! │   │   ├── HTMLSpanElement (<span>)
+//! │   │   ├── HTMLTableElement (<table>)
+//! │   │   ├── HTMLSelectElement (<select>)
+//! │   │   ├── HTMLTextAreaElement (<textarea>)
+//! │   │   ├── HTMLHeadingElement (<h1>-<h6>)
+//! │   │   ├── HTMLListElement (<ul>, <ol>)
+//! │   │   ├── HTMLMediaElement
+//! │   │   │   ├── HTMLVideoElement
+//! │   │   │   └── HTMLAudioElement
+//! │   │   └── ... (other HTML elements)
+//! │   ├── SVGElement
+//! │   │   ├── SVGCircleElement
+//! │   │   ├── SVGRectElement
+//! │   │   ├── SVGPathElement
+//! │   │   ├── SVGLineElement
+//! │   │   ├── SVGTextElement
+//! │   │   ├── SVGPolygonElement
+//! │   │   ├── SVGEllipseElement
+//! │   │   └── ... (other SVG elements)
+//! │   └── MathMLElement
+//! └── CharacterData (nodeType = 3)
+//!     ├── Text (nodeType = 3)
+//!     ├── Comment (nodeType = 8)
+//!     ├── CDATASection (nodeType = 4)
+//!     └── ProcessingInstruction (nodeType = 7)
+//! ```
 
+use chromiumoxide_cdp::cdp::browser_protocol::dom::{BackendNodeId, NodeId};
 use super::*;
 use crate::error::{CdpError, Result};
 
@@ -17,55 +62,10 @@ pub use document_fragment::*;
 pub use character_data::*;
 pub use attr::*;
 
-// https://developer.mozilla.org/en-US/docs/Web/API/Node
-//
-// Node (nodeType = 1-12)
-// ├── Attr (nodeType = 2)
-// ├── Document (nodeType = 9)
-// │   ├── HTMLDocument
-// │   └── XMLDocument
-// ├── DocumentFragment (nodeType = 11)
-// ├── DocumentType (nodeType = 10)
-// ├── Element (nodeType = 1)
-// │   ├── HTMLElement
-// │   │   ├── HTMLAnchorElement (<a>)
-// │   │   ├── HTMLButtonElement (<button>)
-// │   │   ├── HTMLDivElement (<div>)
-// │   │   ├── HTMLFormElement (<form>)
-// │   │   ├── HTMLInputElement (<input>)
-// │   │   ├── HTMLImageElement (<img>)
-// │   │   ├── HTMLParagraphElement (<p>)
-// │   │   ├── HTMLSpanElement (<span>)
-// │   │   ├── HTMLTableElement (<table>)
-// │   │   ├── HTMLSelectElement (<select>)
-// │   │   ├── HTMLTextAreaElement (<textarea>)
-// │   │   ├── HTMLHeadingElement (<h1>-<h6>)
-// │   │   ├── HTMLListElement (<ul>, <ol>)
-// │   │   ├── HTMLMediaElement
-// │   │   │   ├── HTMLVideoElement
-// │   │   │   └── HTMLAudioElement
-// │   │   └── ... (other HTML elements)
-// │   ├── SVGElement
-// │   │   ├── SVGCircleElement
-// │   │   ├── SVGRectElement
-// │   │   ├── SVGPathElement
-// │   │   ├── SVGLineElement
-// │   │   ├── SVGTextElement
-// │   │   ├── SVGPolygonElement
-// │   │   ├── SVGEllipseElement
-// │   │   └── ... (other SVG elements)
-// │   └── MathMLElement
-// └── CharacterData (nodeType = 3)
-//     ├── Text (nodeType = 3)
-//     ├── Comment (nodeType = 8)
-//     ├── CDATASection (nodeType = 4)
-//     └── ProcessingInstruction (nodeType = 7)
-
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Node
     class Node extends Object {
         static #subtype: "node";
-
 
         properties: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/baseURI
@@ -175,21 +175,31 @@ define_js_remote_object!(
 );
 
 impl JsNode {
-    pub fn node_id(&self) -> NodeId {
-        match self.object_subtype() {
-            Some(JsObjectSubtype::Node {
-                node_id,
-                ..
-            }) => NodeId::new(node_id),
+    /// Returns the CDP NodeId for this node.
+    /// 
+    /// This ID is unique within the current page's lifetime and can be used
+    /// for CDP protocol calls that require a node identifier.
+    ///
+    /// Returns `None` if the DOM domain is not enabled. The DOM domain must be enabled
+    /// via `DOM.enable` before node IDs can be retrieved.
+    pub fn node_id(&self) -> Option<NodeId> {
+        match self.remote_subtype() {
+            JsObjectSubtype::Node { node_id, ..  } => {
+                node_id.map(NodeId::new)
+            }
             _ => panic!("JsNode is not a node"),
         }
     }
+
+    /// Returns the CDP BackendNodeId for this node.
+    /// 
+    /// This ID is unique within the current page's lifetime and can be used
+    /// for CDP protocol calls that require a node identifier.
     pub fn backend_node_id(&self) -> BackendNodeId {
-        match self.object_subtype() {
-            Some(JsObjectSubtype::Node {
-                backend_node_id,
-                ..
-            }) => BackendNodeId::new(backend_node_id),
+        match self.remote_subtype() {
+            JsObjectSubtype::Node { backend_node_id, ..  } => {
+                BackendNodeId::new(backend_node_id)
+            }
             _ => panic!("JsNode is not a node"),
         }
     }
@@ -199,12 +209,23 @@ bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[derive(serde::Serialize, serde::Deserialize)]
     #[serde(transparent)]
+    /// Represents the position of a node in the document relative to another node.
+    /// 
+    /// This is a bitflag enum that corresponds to the values returned by
+    /// [`Node.compareDocumentPosition()`](https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition).
+    /// Multiple flags can be combined to describe complex relationships between nodes.
     pub struct JsDocumentPosition: u32 {
+        /// The two nodes are not in the same document
         const DISCONNECTED = 1;
+        /// The second node precedes the reference node in the document
         const PRECEDING = 2;
+        /// The second node follows the reference node in the document
         const FOLLOWING = 4;
+        /// The second node contains the reference node
         const CONTAINS = 8;
+        /// The second node is contained by the reference node
         const CONTAINED_BY = 16;
+        /// The result depends on browser-specific implementation
         const IMPLEMENTATION_SPECIFIC = 32;
     }
 }
@@ -221,27 +242,46 @@ impl schemars::JsonSchema for JsDocumentPosition {
     }
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+/// Represents the type of a DOM node.
+/// 
+/// These values correspond to the [`Node.nodeType`](https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType)
+/// property in the DOM specification. Each value identifies a specific type of node
+/// in the DOM tree.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, schemars::JsonSchema_repr)]
 #[repr(u8)]
 pub enum JsNodeType {
+    /// An Element node like <p> or <div>
     Element = 1,
+    /// An Attribute of an Element
     Attribute = 2,
+    /// The actual Text inside an Element or Attr
     Text = 3,
+    /// A CDATASection, such as <!CDATA[[ ... ]]>
     CDataSection = 4,
+    /// A reference to an entity (deprecated)
     EntityReference = 5,
+    /// An entity definition (deprecated)
     Entity = 6,
+    /// A ProcessingInstruction of an XML document
     ProcessingInstruction = 7,
+    /// A Comment node
     Comment = 8,
+    /// A Document node
     Document = 9,
+    /// A DocumentType node, such as <!DOCTYPE html>
     DocumentType = 10,
+    /// A DocumentFragment node
     DocumentFragment = 11,
+    /// A notation in a DTD (deprecated)
     Notation = 12,
 }
 
 impl JsNodeType {
-    /// Convert from JavaScript node type number
+    /// Converts a numeric node type value to a `JsNodeType` enum variant.
+    /// 
+    /// # Errors
+    /// Returns an error if the value is not a valid node type (1-12).
     pub fn from_u8(value: u8) -> Result<Self> {
         match value {
             1 => Ok(Self::Element),
@@ -260,7 +300,7 @@ impl JsNodeType {
         }
     }
 
-    /// Convert to JavaScript node type number
+    /// Converts the `JsNodeType` enum variant to its numeric value.
     pub fn to_u8(self) -> u8 {
         self as u8
     }

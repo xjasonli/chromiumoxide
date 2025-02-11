@@ -77,15 +77,6 @@ impl<'a, 'b> SubtypePattern for &'a [&'b str] {
     }
 }
 
-impl SubtypePattern for () {
-    fn matches(self, subtype: Option<&str>) -> bool {
-        subtype.is_none()
-    }
-    fn to_schema(self) -> serde_json::Value {
-        serde_json::json!(false)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

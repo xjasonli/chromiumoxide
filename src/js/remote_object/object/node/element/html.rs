@@ -26,7 +26,7 @@ pub use table_cell::*;
 pub use table_row::*;
 pub use table_section::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
     class HtmlElement extends Element inherits Node, Object {
         static #class: "HTML*";

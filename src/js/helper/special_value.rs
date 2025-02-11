@@ -10,6 +10,7 @@ pub(crate) const JS_BIGINT_KEY: &str = "$chromiumoxide::js::bigint";
 pub(crate) const JS_EXPR_KEY  : &str = "$chromiumoxide::js::expr";
 pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
 
+#[derive(Debug, Clone)]
 pub(crate) enum SpecialValue {
     Remote(JsRemote),
     BigInt(JsBigInt),
@@ -23,18 +24,27 @@ impl SpecialValue {
             let r#type = match remote_object.r#type {
                 RemoteObjectType::Object => {
                     let subtype = match remote_object.subtype {
-                        Some(subtype) => Some(
+                        Some(subtype) => {
                             match subtype {
                                 RemoteObjectSubtype::Array => JsObjectSubtype::Array,
                                 RemoteObjectSubtype::Node => {
-                                    let params = DescribeNodeParams::builder()
-                                        .object_id(id.clone())
-                                        .build();
-                                    let response = page.execute(params).await?;
-                                    let node = response.result.node;
+                                    let node = {
+                                        let params = DescribeNodeParams::builder()
+                                            .object_id(id.clone())
+                                            .build();
+                                        let response = page.execute(params).await?;
+                                        response.result.node
+                                    };
+                                    let node_id = if *node.node_id.inner() == 0 {
+                                        None
+                                    } else {
+                                        Some(*node.node_id.inner())
+                                    };
+                                    let backend_node_id = *node.backend_node_id.inner();
+
                                     JsObjectSubtype::Node {
-                                        node_id: *node.node_id.inner(),
-                                        backend_node_id: *node.backend_node_id.inner(),
+                                        node_id,
+                                        backend_node_id,
                                     }
                                 }
                                 RemoteObjectSubtype::Regexp => JsObjectSubtype::RegExp,
@@ -57,8 +67,8 @@ impl SpecialValue {
                                     return Err(CdpError::UnexpectedValue(format!("Unsupported remote object subtype: {subtype:?}")));
                                 }
                             }
-                        ),
-                        None => None,
+                        }
+                        None => JsObjectSubtype::None,
                     };
                     JsRemoteObjectType::Object(subtype)
                 }
@@ -194,9 +204,8 @@ impl serde::Serialize for JsRemote {
         };
 
         use serde::ser::SerializeStruct;
-        let mut s = serializer.serialize_struct("JsRemoteObject", 2)?;
+        let mut s = serializer.serialize_struct("JsRemoteObject", 1)?;
         s.serialize_field(JS_REMOTE_KEY, &proxy)?;
-        s.serialize_field("class", &self.class)?;
         s.end()
     }
 }

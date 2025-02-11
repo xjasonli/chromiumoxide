@@ -1102,6 +1102,131 @@ impl Page {
         self.inner.execution_context().await
     }
 
+    /// Returns the secondary execution context identifier of this page that
+    /// represents the context for JavaScript execution for manipulating the
+    /// DOM.
+    ///
+    /// See `Page::set_contents`
+    pub async fn secondary_execution_context(&self) -> Result<Option<ExecutionContextId>> {
+        self.inner.secondary_execution_context().await
+    }
+
+    pub async fn frame_execution_context(
+        &self,
+        frame_id: FrameId,
+    ) -> Result<Option<ExecutionContextId>> {
+        self.inner.frame_execution_context(frame_id).await
+    }
+
+    pub async fn frame_secondary_execution_context(
+        &self,
+        frame_id: FrameId,
+    ) -> Result<Option<ExecutionContextId>> {
+        self.inner.frame_secondary_execution_context(frame_id).await
+    }
+
+    /// Evaluates given script in every frame upon creation (before loading
+    /// frame's scripts)
+    pub async fn evaluate_on_new_document(
+        &self,
+        script: impl Into<AddScriptToEvaluateOnNewDocumentParams>,
+    ) -> Result<ScriptIdentifier> {
+        Ok(self.execute(script.into()).await?.result.identifier)
+    }
+
+    /// Set the content of the frame.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::page::Page;
+    /// # use chromiumoxide::error::Result;
+    /// # async fn demo(page: Page) -> Result<()> {
+    ///     page.set_content("<body>
+    ///  <h1>This was set via chromiumoxide</h1>
+    ///  </body>").await?;
+    ///     # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_content(&self, html: impl AsRef<str>) -> Result<&Self> {
+        let mut call = CallFunctionOnParams::builder()
+            .function_declaration(
+                "(html) => {
+            document.open();
+            document.write(html);
+            document.close();
+        }",
+            )
+            .argument(
+                CallArgument::builder()
+                    .value(serde_json::json!(html.as_ref()))
+                    .build(),
+            )
+            .build()
+            .unwrap();
+
+        call.execution_context_id = self
+            .inner
+            .execution_context_for_world(None, DOMWorldKind::Secondary)
+            .await?;
+
+        self.evaluate_function(call).await?;
+        // relying that document.open() will reset frame lifecycle with "init"
+        // lifecycle event. @see https://crrev.com/608658
+        self.wait_for_navigation().await
+    }
+
+    /// Returns the HTML content of the page
+    pub async fn content(&self) -> Result<String> {
+        Ok(self
+            .evaluate(
+                "{
+          let retVal = '';
+          if (document.doctype) {
+            retVal = new XMLSerializer().serializeToString(document.doctype);
+          }
+          if (document.documentElement) {
+            retVal += document.documentElement.outerHTML;
+          }
+          retVal
+      }
+      ",
+            )
+            .await?
+            .into_value()?)
+    }
+
+    #[cfg(feature = "bytes")]
+    /// Returns the HTML content of the page
+    pub async fn content_bytes(&self) -> Result<bytes::Bytes> {
+        Ok(self
+            .evaluate(
+                "{
+            let retVal = '';
+            if (document.doctype) {
+            retVal = new XMLSerializer().serializeToString(document.doctype);
+            }
+            if (document.documentElement) {
+            retVal += document.documentElement.outerHTML;
+            }
+            retVal
+        }
+        ",
+            )
+            .await?
+            .into_value()?)
+    }
+
+    /// Returns source for the script with given id.
+    ///
+    /// Debugger must be enabled.
+    pub async fn get_script_source(&self, script_id: impl Into<String>) -> Result<String> {
+        Ok(self
+            .execute(GetScriptSourceParams::new(ScriptId::from(script_id.into())))
+            .await?
+            .result
+            .script_source)
+    }
+
     /// Execute JavaScript code in an anonymous scope.
     ///
     /// This method evaluates JavaScript code in an anonymous scope. Any declarations
@@ -1295,154 +1420,31 @@ impl Page {
     /// Returns an error if:
     /// * The function name is invalid
     /// * The function cannot be exposed to JavaScript
-    pub async fn expose_function<'a, F, K, E, R, A>(
+    pub async fn expose_function<'f, F, M, E, R, A>(
         &self,
         name: impl Into<String>,
         function: F,
-    ) -> Result<js::ExposedFunction<'a>>
+    ) -> Result<js::ExposedFunction<'f>>
     where 
-        F: js::CallbackAdapter<K, E, R, A> + 'a,
-        K: 'static,
-        E: js::JsCallbackError,
-        R: js::NativeValueIntoJs + 'a,
-        A: js::FunctionNativeArgsFromJs + 'a,
+        F: js::ExposableFn<M, E, R, A> + 'f,
+        M: 'f,
+        E: js::ExposableFnError + 'f,
+        R: js::NativeValueIntoJs + 'f,
+        for<'a> A: js::FunctionNativeArgsFromJs + 'a,
     {
         self.inner.expose_function(name.into(), function).await
-    }
-
-    /// Returns the secondary execution context identifier of this page that
-    /// represents the context for JavaScript execution for manipulating the
-    /// DOM.
-    ///
-    /// See `Page::set_contents`
-    pub async fn secondary_execution_context(&self) -> Result<Option<ExecutionContextId>> {
-        self.inner.secondary_execution_context().await
-    }
-
-    pub async fn frame_execution_context(
-        &self,
-        frame_id: FrameId,
-    ) -> Result<Option<ExecutionContextId>> {
-        self.inner.frame_execution_context(frame_id).await
-    }
-
-    pub async fn frame_secondary_execution_context(
-        &self,
-        frame_id: FrameId,
-    ) -> Result<Option<ExecutionContextId>> {
-        self.inner.frame_secondary_execution_context(frame_id).await
-    }
-
-    /// Evaluates given script in every frame upon creation (before loading
-    /// frame's scripts)
-    pub async fn evaluate_on_new_document(
-        &self,
-        script: impl Into<AddScriptToEvaluateOnNewDocumentParams>,
-    ) -> Result<ScriptIdentifier> {
-        Ok(self.execute(script.into()).await?.result.identifier)
-    }
-
-    /// Set the content of the frame.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use chromiumoxide::page::Page;
-    /// # use chromiumoxide::error::Result;
-    /// # async fn demo(page: Page) -> Result<()> {
-    ///     page.set_content("<body>
-    ///  <h1>This was set via chromiumoxide</h1>
-    ///  </body>").await?;
-    ///     # Ok(())
-    /// # }
-    /// ```
-    pub async fn set_content(&self, html: impl AsRef<str>) -> Result<&Self> {
-        let mut call = CallFunctionOnParams::builder()
-            .function_declaration(
-                "(html) => {
-            document.open();
-            document.write(html);
-            document.close();
-        }",
-            )
-            .argument(
-                CallArgument::builder()
-                    .value(serde_json::json!(html.as_ref()))
-                    .build(),
-            )
-            .build()
-            .unwrap();
-
-        call.execution_context_id = self
-            .inner
-            .execution_context_for_world(None, DOMWorldKind::Secondary)
-            .await?;
-
-        self.evaluate_function(call).await?;
-        // relying that document.open() will reset frame lifecycle with "init"
-        // lifecycle event. @see https://crrev.com/608658
-        self.wait_for_navigation().await
-    }
-
-    /// Returns the HTML content of the page
-    pub async fn content(&self) -> Result<String> {
-        Ok(self
-            .evaluate(
-                "{
-          let retVal = '';
-          if (document.doctype) {
-            retVal = new XMLSerializer().serializeToString(document.doctype);
-          }
-          if (document.documentElement) {
-            retVal += document.documentElement.outerHTML;
-          }
-          retVal
-      }
-      ",
-            )
-            .await?
-            .into_value()?)
-    }
-
-    #[cfg(feature = "bytes")]
-    /// Returns the HTML content of the page
-    pub async fn content_bytes(&self) -> Result<bytes::Bytes> {
-        Ok(self
-            .evaluate(
-                "{
-            let retVal = '';
-            if (document.doctype) {
-            retVal = new XMLSerializer().serializeToString(document.doctype);
-            }
-            if (document.documentElement) {
-            retVal += document.documentElement.outerHTML;
-            }
-            retVal
-        }
-        ",
-            )
-            .await?
-            .into_value()?)
-    }
-
-    /// Returns source for the script with given id.
-    ///
-    /// Debugger must be enabled.
-    pub async fn get_script_source(&self, script_id: impl Into<String>) -> Result<String> {
-        Ok(self
-            .execute(GetScriptSourceParams::new(ScriptId::from(script_id.into())))
-            .await?
-            .result
-            .script_source)
-    }
-
-    pub(crate) fn into_inner(self) -> Arc<PageInner> {
-        self.inner
     }
 }
 
 impl From<Arc<PageInner>> for Page {
     fn from(inner: Arc<PageInner>) -> Self {
         Self { inner }
+    }
+}
+
+impl From<Page> for Arc<PageInner> {
+    fn from(page: Page) -> Self {
+        page.inner
     }
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
     class Promise extends Object {
         static #subtype: "promise";

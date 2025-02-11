@@ -8,7 +8,7 @@ use super::*;
 pub async fn eval_global<R: NativeValueFromJs>(
     page: Arc<PageInner>,
     expr: impl Into<String>,
-    context: Option<ExecutionContext>,
+    context: Option<GlobalExecutionContext>,
     options: EvalOptions,
 ) -> Result<R> {
     let mut params = EvaluateParams::builder()
@@ -20,8 +20,8 @@ pub async fn eval_global<R: NativeValueFromJs>(
         .unwrap();
     if let Some(context) = context {
         match context {
-            ExecutionContext::Id(id) => params.context_id = Some(id),
-            ExecutionContext::UniqueId(id) => params.unique_context_id = Some(id),
+            GlobalExecutionContext::Id(id) => params.context_id = Some(id),
+            GlobalExecutionContext::UniqueId(id) => params.unique_context_id = Some(id),
         }
     }
     let resp = page.execute(params).await?.result;

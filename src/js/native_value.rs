@@ -8,11 +8,7 @@ use serde_json::Value as JsonValue;
 /// - Returned from JavaScript functions
 /// - Used as property values in JavaScript objects
 pub trait NativeValue: NativeValueIntoJs + NativeValueFromJs {}
-
-impl<T> NativeValue for T
-where T
-    : NativeValueIntoJs + NativeValueFromJs
-{}
+impl<T: NativeValueIntoJs + NativeValueFromJs> NativeValue for T {}
 
 /// A trait for types that can be converted into JavaScript values.
 /// 
@@ -25,15 +21,9 @@ where T
 /// - `Serialize`: Can be serialized into JSON
 /// - `Debug`: Can be formatted for debugging
 /// - `Send + Sync`: Thread-safe
-pub trait NativeValueIntoJs
-    : serde::Serialize
-    + std::fmt::Debug + Send + Sync {}
-
+pub trait NativeValueIntoJs : serde::Serialize + std::fmt::Debug + Send + Sync {}
 impl<T> NativeValueIntoJs for T
-where T
-    : serde::Serialize
-    + std::fmt::Debug + Send + Sync + ?Sized
-{}
+where T : serde::Serialize + std::fmt::Debug + Send + Sync + ?Sized {}
 
 /// A trait for types that can be converted from JavaScript values.
 /// 
@@ -48,15 +38,11 @@ where T
 ///    during type conversion, rather than for validation
 /// - `Debug`: Can be formatted for debugging
 /// - `Send + Sync`: Thread-safe
-pub trait NativeValueFromJs
-    : serde::de::DeserializeOwned + schemars::JsonSchema
+pub trait NativeValueFromJs : serde::de::DeserializeOwned + schemars::JsonSchema
     + std::fmt::Debug + Send + Sync {}
+impl<T: serde::de::DeserializeOwned + schemars::JsonSchema> NativeValueFromJs for T
+where T: std::fmt::Debug + Send + Sync {}
 
-impl<T> NativeValueFromJs for T
-where T
-    : serde::de::DeserializeOwned + schemars::JsonSchema
-    + std::fmt::Debug + Send + Sync
-{}
 
 /// A trait for function argument tuples that can be converted from JavaScript values.
 /// 

@@ -12,7 +12,7 @@ pub use dom_token_list::*;
 pub use html_collection::*;
 pub use node_list::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Indexed_collections#working_with_array-like_objects
     class ArrayLike extends Object {
         static #subtype: "array";

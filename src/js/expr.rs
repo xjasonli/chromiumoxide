@@ -1,5 +1,20 @@
 use crate::js::helper;
 
+#[macro_export]
+macro_rules! js_expr_str {
+    ($($js:tt)+) => {
+        stringify!($($js)+)
+    }
+}
+#[macro_export]
+macro_rules! js_expr {
+    ($($js:tt)+) => {
+        crate::js::JsExpr::new(stringify!($($js)+))
+    }
+}
+pub use js_expr;
+pub use js_expr_str;
+
 #[derive(Debug, Clone)]
 pub struct JsExpr(pub String);
 

@@ -106,7 +106,7 @@ impl From<CallFunctionOnParams> for Evaluation {
 pub struct EvalParams {
     pub expr: String,
     pub this: Option<JsRemoteObject>,
-    pub context: Option<ScopedExecutionContext>,
+    pub context: Option<ExecutionContext>,
     pub options: EvalOptions,
 }
 
@@ -120,7 +120,7 @@ impl EvalParams {
         Self { this: Some(this), ..self }
     }
 
-    pub fn context<T: Into<ScopedExecutionContext>>(self, context: T) -> Self {
+    pub fn context<T: Into<ExecutionContext>>(self, context: T) -> Self {
         Self { context: Some(context.into()), ..self }
     }
 
@@ -138,7 +138,7 @@ impl<T: Into<String>> From<T> for EvalParams {
 #[derive(Debug, Clone)]
 pub struct EvalGlobalParams {
     pub expr: String,
-    pub context: Option<ExecutionContext>,
+    pub context: Option<GlobalExecutionContext>,
     pub options: EvalOptions,
 }
 
@@ -147,7 +147,7 @@ impl EvalGlobalParams {
         Self { expr: expr.into(), context: None, options: EvalOptions::default() }
     }
 
-    pub fn context<T: Into<ExecutionContext>>(self, context: T) -> Self {
+    pub fn context<T: Into<GlobalExecutionContext>>(self, context: T) -> Self {
         Self { context: Some(context.into()), ..self }
     }
 
@@ -161,14 +161,6 @@ impl<T: Into<String>> From<T> for EvalGlobalParams {
         EvalGlobalParams::new(expr)
     }
 }
-
-#[macro_export]
-macro_rules! js {
-    ($($js:tt)+) => {
-        stringify!($($js)+)
-    }
-}
-pub use js;
 
 mod private {
     pub trait Sealed {}

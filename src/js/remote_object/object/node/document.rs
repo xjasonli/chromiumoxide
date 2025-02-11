@@ -4,7 +4,7 @@ pub mod html;
 
 pub use html::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Document
     class Document extends Node inherits Object {
         static #class: ["HTMLDocument", "XMLDocument"];

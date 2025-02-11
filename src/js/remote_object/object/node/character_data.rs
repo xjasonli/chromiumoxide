@@ -8,7 +8,7 @@ pub use text::*;
 pub use comment::*;
 pub use processing_instruction::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData
     class CharacterData extends Node inherits Object {
         static #class: [

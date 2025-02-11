@@ -38,21 +38,44 @@ pub use data_view::*;
 pub use wasm_memory::*;
 pub use wasm_value::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
     class Object {
         static #type: "object";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/proto
-            #[rename = proto]
-            __proto__: JsObject [readonly];
-
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor
             constructor: JsFunction [readonly];
         }
 
         methods: {
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+            objectAssign<I, T>(...sources: I) -> Self
+            where
+                I: IntoIterator<Item = T>,
+                T: NativeValueIntoJs {
+                return Object.assign(this, ...sources);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
+            objectCreate() -> Self {
+                return Object.create(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
+            /// 
+            #[rename = + withProperties]
+            objectCreate<T: NativeValueIntoJs>(properties: T) -> Self {
+                return Object.create(this, properties);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperties
+            /// 
+            objectDefineProperties<T: NativeValueIntoJs>(properties: T) -> Self {
+                return Object.defineProperties(this, properties);
+            }
+
+
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwnProperty
             hasOwnProperty(key: String) -> bool;
 
@@ -72,15 +95,38 @@ define_js_remote_object!(
 );
 
 impl JsObject {
-    pub fn object_subtype(&self) -> Option<JsObjectSubtype> {
-        self.object_type().object_subtype()
+    pub fn remote_subtype(&self) -> JsObjectSubtype {
+        self.remote_type()
+            .object_subtype()
+            .expect("JsObject is not an object")
     }
 }
 
-define_js_remote_object!(
+
+pub type JsPropertyDescriptor<T> = AnyOf!(JsDataDescriptor<T>, JsAccessorDescriptor);
+
+#[derive(Debug, Clone, Copy)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct JsDataDescriptor<T> {
+    value: Option<T>,
+    writable: bool,
+    configurable: bool,
+    enumerable: bool,
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct JsAccessorDescriptor {    
+    get: JsFunction,
+    set: JsFunction,
+    configurable: bool,
+    enumerable: bool,
+}
+
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Window
     class Window extends Object {
-        static #subtype: ();
+        static #subtype: "none";
         static #class: "Window";
 
         properties: {
@@ -95,10 +141,10 @@ define_js_remote_object!(
     }
 );
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Location
     class Location extends Object {
-        static #subtype: ();
+        static #subtype: "none";
         static #class: "Location";
 
         properties: {
@@ -149,10 +195,10 @@ define_js_remote_object!(
     }
 );
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/FileList
     class FileList extends Object {
-        static #subtype: ();
+        static #subtype: "none";
         static #class: "FileList";
 
         properties: {
@@ -166,10 +212,10 @@ define_js_remote_object!(
     }
 );
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Blob
     class Blob extends Object {
-        static #subtype: ();
+        static #subtype: "none";
         static #class: ["Blob", "File"];
         properties: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/size
@@ -198,10 +244,10 @@ define_js_remote_object!(
     }
 );
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/File
     class File extends Blob inherits Object {
-        static #subtype: ();
+        static #subtype: "none";
         static #class: "File";
 
         properties: {

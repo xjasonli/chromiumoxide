@@ -8,9 +8,13 @@ use chromiumoxide_cdp::cdp::js_protocol::runtime::{ReleaseObjectParams, RemoteOb
 use crate::{error::Result, handler::PageInner, js::de::PageDeserializer};
 use super::*;
 
+mod macros;
+
 pub mod object;
 pub mod function;
 pub mod symbol;
+
+use macros::*;
 
 pub use object::*;
 pub use function::*;
@@ -54,12 +58,12 @@ pub struct JsRemoteObject(Arc<JsRemoteObjectInner>);
 /// - JavaScript evaluation and function invocation
 impl JsRemoteObject {
     /// Returns the unique identifier of this remote object.
-    pub fn object_id(&self) -> RemoteObjectId {
+    pub fn remote_id(&self) -> RemoteObjectId {
         self.0.data.id.clone()
     }
 
     /// Returns the JavaScript type of this remote object.
-    pub fn object_type(&self) -> &JsRemoteObjectType {
+    pub fn remote_type(&self) -> &JsRemoteObjectType {
         &self.0.data.r#type
     }
 
@@ -72,14 +76,14 @@ impl JsRemoteObject {
     /// ```no_run
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # fn example(obj: JsRemoteObject) {
-    /// match obj.object_class() {
+    /// match obj.remote_class() {
     ///     "Array" => println!("This is an array"),
     ///     "HTMLElement" => println!("This is an HTML element"),
-    ///     _ => println!("Other type: {}", obj.object_class()),
+    ///     _ => println!("Other type: {}", obj.remote_class()),
     /// }
     /// # }
     /// ```
-    pub fn object_class(&self) -> &str {
+    pub fn remote_class(&self) -> &str {
         &self.0.data.class
     }
 
@@ -94,12 +98,12 @@ impl JsRemoteObject {
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # use chromiumoxide::js::JsElement;
     /// # fn example(obj: JsRemoteObject) {
-    /// if obj.is::<JsElement>() {
+    /// if obj.is_instance_of::<JsElement>() {
     ///     // This object is an HTML element
     /// }
     /// # }
     /// ```
-    pub fn is<T: Subclass<Self>>(&self) -> bool {
+    pub fn is_instance_of<T: Subclass<Self>>(&self) -> bool {
         T::is_instance(self)
     }
 
@@ -225,8 +229,54 @@ impl JsRemoteObject {
     /// # }
     /// ```
     pub fn invoke_method(&self, name: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
-        let expr = format!("this['{}']", name.into());
+        let function = "(name, ...args) => {{ return this[name](...args); }}";
+        self.invoke_function(function, options)
+            .argument(name.into())
+            .unwrap() // String serializing is infallible
+    }
+
+    /// Invokes a well-known Symbol method on this object.
+    /// 
+    /// This method executes a method referenced by a well-known Symbol (like `Symbol.iterator`).
+    /// The method is called with `this` bound to the current object.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Call Symbol.iterator method
+    /// let iterator = obj.invoke_symbol_method("iterator", Default::default())
+    ///     .invoke::<JsIterator>()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn invoke_symbol_method(&self, symbol: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
+        let expr = format!("this[Symbol.{}](...arguments)", symbol.into());
         self.invoke_function(expr, options)
+    }
+
+    /// Invokes a Symbol method registered with `Symbol.for()` on this object.
+    /// 
+    /// This method executes a method referenced by a Symbol registered in the global Symbol registry.
+    /// The method is called with `this` bound to the current object.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Call method referenced by a registered Symbol
+    /// let result = obj.invoke_symbol_method_for("mySymbol", Default::default())
+    ///     .invoke::<String>()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn invoke_symbol_method_for(&self, symbol: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
+        let function = "(symbol, ...args) => {{ return this[Symbol.for(symbol)](...args); }}";
+        self.invoke_function(function, options)
+            .argument(symbol.into())
+            .unwrap() // String serializing is infallible
     }
 
     /// Gets a property value from this object.
@@ -252,8 +302,56 @@ impl JsRemoteObject {
     where
         T: NativeValueFromJs,
     {
-        let expr = format!("this['{}']", name.into());
+        let function = "(name) => {{ return this[name]; }}";
+        self.invoke_function(function, EvalOptions::default())
+            .argument(name.into())?
+            .invoke::<T>().await
+    }
+
+    /// Gets a property value referenced by a well-known Symbol from this object.
+    /// 
+    /// This method retrieves a property value referenced by a well-known Symbol (like `Symbol.toStringTag`)
+    /// and converts it to the specified Rust type.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Get Symbol.toStringTag property
+    /// let tag: String = obj.get_symbol_property("toStringTag").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_symbol_property<T>(&self, symbol: impl Into<String>) -> Result<T>
+    where
+        T: NativeValueFromJs,
+    {
+        let expr = format!("this[Symbol.{}])", symbol.into());
         self.eval(expr, EvalOptions::default()).await
+    }
+
+    /// Gets a property value referenced by a Symbol from the global registry.
+    /// 
+    /// This method retrieves a property value referenced by a Symbol registered with `Symbol.for()`
+    /// and converts it to the specified Rust type.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Get property referenced by a registered Symbol
+    /// let value: String = obj.get_symbol_property_for("mySymbol").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_symbol_property_for<T>(&self, symbol: impl Into<String>) -> Result<T>
+    where
+        T: NativeValueFromJs,
+    {
+        let function = "(symbol) => {{ return this[Symbol.for(symbol)]; }}";
+        self.invoke_function(function, EvalOptions::default())
+            .argument(symbol.into())?
+            .invoke::<T>().await
     }
 
     /// Sets a property value on this object.
@@ -277,8 +375,58 @@ impl JsRemoteObject {
     where
         T: NativeValueIntoJs,
     {
-        let function = format!("(value) => {{ this['{}'] = value; }}", name.into());
+        let function = "(name, value) => {{ this[name] = value; }}";
         self.invoke_function(function, EvalOptions::default())
+            .argument(name.into())?
+            .argument(value)?
+            .invoke().await
+    }
+
+    /// Sets a property value referenced by a well-known Symbol on this object.
+    /// 
+    /// This method sets a property value referenced by a well-known Symbol (like `Symbol.toStringTag`),
+    /// converting the Rust value to JavaScript.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Set Symbol.toStringTag property
+    /// obj.set_symbol_property("toStringTag", "MyObject").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_symbol_property<T>(&self, symbol: impl Into<String>, value: T) -> Result<()>
+    where
+        T: NativeValueIntoJs,
+    {
+        let function = format!("(value) => {{ this[Symbol.{} = value; }}", symbol.into());
+        self.invoke_function(function, EvalOptions::default())
+            .argument(value)?
+            .invoke().await
+    }
+
+    /// Sets a property value referenced by a Symbol from the global registry.
+    /// 
+    /// This method sets a property value referenced by a Symbol registered with `Symbol.for()`,
+    /// converting the Rust value to JavaScript.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Set property referenced by a registered Symbol
+    /// obj.set_symbol_property_for("mySymbol", "value").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_symbol_property_for<T>(&self, symbol: impl Into<String>, value: T) -> Result<()>
+    where
+        T: NativeValueIntoJs,
+    {
+        let function = "(symbol, value) => {{ this[Symbol.for(symbol)] = value; }}";
+        self.invoke_function(function, EvalOptions::default())
+            .argument(symbol.into())?
             .argument(value)?
             .invoke().await
     }
@@ -296,13 +444,13 @@ impl JsRemoteObject {
 
 impl From<JsRemoteObject> for RemoteObjectId {
     fn from(value: JsRemoteObject) -> Self {
-        value.object_id()
+        value.remote_id()
     }
 }
 
 impl From<&JsRemoteObject> for RemoteObjectId {
     fn from(value: &JsRemoteObject) -> Self {
-        value.object_id()
+        value.remote_id()
     }
 }
 
@@ -408,7 +556,7 @@ impl schemars::JsonSchema for JsRemoteObjectInner {
 #[serde(tag = "type")]
 pub enum JsRemoteObjectType {
     /// A JavaScript object, with an optional subtype for specific object kinds
-    Object(Option<JsObjectSubtype>),
+    Object(JsObjectSubtype),
     /// A JavaScript function
     Function,
     /// A JavaScript symbol
@@ -435,7 +583,7 @@ impl JsRemoteObjectType {
 
     pub fn object_subtype(&self) -> Option<JsObjectSubtype> {
         if let JsRemoteObjectType::Object(subtype) = self {
-            *subtype
+            Some(*subtype)
         } else {
             None
         }
@@ -456,6 +604,11 @@ impl JsRemoteObjectType {
 #[serde(tag = "subtype")]
 #[serde(rename_all = "lowercase")]
 pub enum JsObjectSubtype {
+    /// A JavaScript object that is not categorized into any specific subtype by CDP.
+    /// This includes complex objects like window, Location, History, and other objects
+    /// that don't fall into CDP's predefined subtypes.
+    None,
+
     /// A JavaScript Array object
     Array,
     
@@ -466,7 +619,7 @@ pub enum JsObjectSubtype {
     /// - `backend_node_id`: Persistent backend node ID
     Node {
         #[serde(rename = "nodeId")]
-        node_id: i64,
+        node_id: Option<i64>,
         #[serde(rename = "backendNodeId")]
         backend_node_id: i64,
     },
@@ -523,6 +676,7 @@ pub enum JsObjectSubtype {
 impl JsObjectSubtype {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::None => "none",
             Self::Array => "array",
             Self::Node { .. } => "node",
             Self::RegExp => "regexp",
@@ -542,6 +696,9 @@ impl JsObjectSubtype {
             Self::WebAssemblyMemory => "wasmmemory",
             Self::WasmValue => "wasmvalue",
         }
+    }
+    pub fn is_none(&self) -> bool {
+        matches!(self, JsObjectSubtype::None)
     }
     pub fn is_array(&self) -> bool {
         matches!(self, JsObjectSubtype::Array)
@@ -599,569 +756,4 @@ impl JsObjectSubtype {
     }
 }
 
-
-macro_rules! define_js_properties {
-    ({
-        $($rules:tt)*
-    }) => {
-        define_js_properties!(@parse $($rules)*);
-    };
-
-    (@parse $($rules:tt)+) => {
-        define_js_properties!(@header $($rules)+);
-    };
-
-    (@parse) => {};
-
-    (@header
-        $(#[doc = $doc:expr])*
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_properties!(@entry
-                $(#[doc = $doc])*
-                $name[[< $name:snake >]]
-                $($rest)*
-            );
-        }
-    };
-    (@header
-        $(#[doc = $doc:expr])*
-        #[rename = $rename:ident $(+ $suffix:ident)?]
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_properties!(@entry
-                $(#[doc = $doc])*
-                $name[[< $rename:snake $( _ $suffix:snake)? >]]
-                $($rest)*
-            );
-        }
-    };
-    (@header
-        $(#[doc = $doc:expr])*
-        #[rename = + $suffix:ident]
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_properties!(@entry
-                $(#[doc = $doc])*
-                $name[[< $name:snake _ $suffix:snake >]]
-                $($rest)*
-            );
-        }
-    };
-
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty [readonly];
-        $($rest:tt)*
-    ) => {
-        define_js_properties!(@getter $(#[doc = $doc])* $name[$rename]: $ty,);
-        define_js_properties!(@parse $($rest)*);
-    };
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty [readonly] {
-            $(get() {
-                $($getter:tt)+
-            })?
-        }
-        $($rest:tt)*
-    ) => {
-        define_js_properties!(@getter $(#[doc = $doc])* $name[$rename]: $ty, $($($getter)+)?);
-        define_js_properties!(@parse $($rest)*);
-    };
-
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty;
-        $($rest:tt)*
-    ) => {
-        define_js_properties!(@getter $(#[doc = $doc])* $name[$rename]: $ty,);
-        define_js_properties!(@setter $(#[doc = $doc])* $name[$rename]: $ty,);
-        define_js_properties!(@parse $($rest)*);
-    };
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty {
-            $(get() {
-                $($getter:tt)+
-            })?
-            $(set($var:ident) {
-                $($setter:tt)+
-            })?
-        }
-        $($rest:tt)*
-    ) => {
-        define_js_properties!(@getter $(#[doc = $doc])* $name[$rename]: $ty, $($($getter)+)?);
-        define_js_properties!(@setter $(#[doc = $doc])* $name[$rename]: $ty, $($var, $($setter)+)?);
-        define_js_properties!(@parse $($rest)*);
-    };
-
-    (@getter
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty,
-    ) => {
-        $(#[doc = $doc])*
-        pub async fn $rename(&self) -> Result<$ty> {
-            self.get_property(stringify!($name)).await
-        }
-    };
-    (@getter
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty,
-        $($js:tt)+
-    ) => {
-        $(#[doc = $doc])*
-        pub async fn $rename(&self) -> Result<$ty> {
-            const JS: &str = concat!(
-                "() => {",
-                    stringify!($($js)+),
-                "}",
-            );
-            self.invoke_function(JS, EvalOptions::default())
-                .invoke().await
-        }
-    };
-    (@setter
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty,
-    ) => {
-        paste::paste! {
-            $(#[doc = $doc])*
-            pub async fn [< set_ $rename >](&self, value: $ty) -> Result<()> {
-                self.set_property(stringify!($name), value).await
-            }
-        }
-    };
-    (@setter
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]: $ty:ty,
-        $var:ident,
-        $($js:tt)+
-    ) => {
-        paste::paste! {
-            $(#[doc = $doc])*
-            pub async fn [< set_ $rename >](&self, [< $var:snake >]: $ty) -> Result<()> {
-                const JS: &str = concat!(
-                    "(", stringify!($var), ") => {",
-                        stringify!($($js)+),
-                    "}",
-                );
-                self.invoke_function(JS, EvalOptions::default())
-                    .argument([< $var:snake >])?
-                    .invoke().await
-            }
-        }
-    };
-}
-
-macro_rules! define_js_methods {
-    ({
-        $($t:tt)*
-    }) => {
-        define_js_methods!(@parse $($t)*);
-    };
-
-    (@parse $($t:tt)+) => {
-        define_js_methods!(@header $($t)+);
-    };
-
-    (@parse) => {};
-
-    (@header
-        $(#[doc = $doc:expr])*
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_methods!(@entry
-                $(#[doc = $doc])*
-                $name[[< $name:snake >]]
-                $($rest)*
-            );
-        }
-    };
-    (@header
-        $(#[doc = $doc:expr])*
-        #[rename = $rename:ident $(+ $suffix:ident)?]
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_methods!(@entry
-                $(#[doc = $doc])*
-                $name[[< $rename:snake $( _ $suffix:snake)? >]]
-                $($rest)*
-            );
-        }
-    };
-    (@header
-        $(#[doc = $doc:expr])*
-        #[rename = + $suffix:ident]
-        $name:ident
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            define_js_methods!(@entry
-                $(#[doc = $doc])*
-                $name[[< $name:snake _ $suffix:snake >]]
-                $($rest)*
-            );
-        }
-    };
-
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]
-        $(< $( $lt:tt $( : $clt:ty )? ),+ >)?
-        (
-            $(
-                $(... $($spread_marker:block)?)?
-                $arg:ident $(? $($optional:block)?)? : $arg_type:ty
-            ),* $(,)?
-        ) -> $ty:ty
-        $(where
-            $( $lt2:tt : $clt2:ty ),+
-        )?
-        ;
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            $(#[doc = $doc])*
-            pub async fn $rename$(< $( $lt $( : $clt )? ),+ >)?(
-                &self,
-                $(
-                    [< $arg:snake >]:
-                    $($($optional)? Optional<)?
-                        $arg_type
-                    $($($optional)? >)?
-                    ,
-                )*
-            ) -> Result<$ty>
-            $(where
-                $( $lt2: $clt2 ),+
-            )?
-            {
-                let invoker = self.invoke_method(stringify!($name), EvalOptions::default());
-                $( define_js_methods!(@argument invoker $(... $($spread_marker)?)? [< $arg:snake >]); )*
-                invoker.invoke().await
-            }
-        }
-        define_js_methods!(@parse $($rest)*);
-    };
-    (@entry
-        $(#[doc = $doc:expr])*
-        $name:ident[$rename:ident]
-        $(< $( $lt:tt $( : $clt:ty )? ),+ >)?
-        (
-            $(
-                $(... $($spread_marker:block)?)?
-                $arg:ident $(? $($optional:block)?)? : $arg_type:ty
-            ),* $(,)?
-        ) -> $ty:ty
-        $(where
-            $( $lt2:tt : $clt2:ty ),+
-        )?
-        {
-            $($js:tt)*
-        }
-        $($rest:tt)*
-    ) => {
-        paste::paste! {
-            $(#[doc = $doc])*
-            pub async fn $rename$(< $( $lt $( : $clt )? ),+ >)?(
-                &self,
-                $(
-                    [< $arg:snake >]:
-                    $($($optional)? Optional<)?
-                        $arg_type
-                    $($($optional)? >)?
-                    ,
-                )*
-            ) -> Result<$ty>
-            $(where
-                $( $lt2: $clt2 ),+
-            )?
-            {
-                const FUNCTION: &str = concat!(
-                    "(", $(stringify!($arg),)* ") => {",
-                        stringify!($($js)*),
-                    "}",
-                );
-                let invoker = self.invoke_function(FUNCTION, EvalOptions::default());
-                $( define_js_methods!(@argument invoker $(... $($spread_marker)?)? [< $arg:snake >]); )*
-                invoker.invoke().await
-            }
-        }
-        define_js_methods!(@parse $($rest)*);
-    };
-
-    (@argument $var:ident ... $arg:ident) => {
-        let $var = $var.arguments_spread($arg)?;
-    };
-    (@argument $var:ident $arg:ident) => {
-        let $var = $var.argument($arg)?;
-    };
-}
-
-macro_rules! define_js_remote_object {
-    (
-        $(#[$meta:meta])*
-        class $t:ident { $($body:tt)+ }
-    ) => {
-        define_js_remote_object!(
-            @
-            $(#[$meta])*
-            class $t extends RemoteObject { $($body)+ }
-        );
-    };
-    (
-        $(#[$meta:meta])*
-        class $t:ident extends $parent:ident { $($body:tt)+ }
-    ) => {
-        define_js_remote_object!(
-            @
-            $(#[$meta])*
-            class $t extends $parent inherits RemoteObject { $($body)+ }
-        );
-    };
-    (
-        $(#[$meta:meta])*
-        class $t:ident extends $parent:ident inherits $($ancestor:ident),+ { $($body:tt)+ }
-    ) => {
-        define_js_remote_object!(
-            @
-            $(#[$meta])*
-            class $t extends $parent inherits $($ancestor,)+ RemoteObject { $($body)+ }
-        );
-    };
-
-    (
-        @
-        $(#[$meta:meta])*
-        class $t:ident
-        extends $parent:ident
-        $(inherits $($ancestor:ident),+)? {
-            $(static #type: $type:literal;)?
-            $(static #subtype: $subtype:expr;)?
-            $(static #class: $class:tt;)?
-
-            $(
-                properties: $properties:tt
-            )?
-            $(
-                methods: $methods:tt
-            )?
-        }
-    ) => {
-        paste::paste! {
-            #[derive(Debug, Clone)]
-            $(#[$meta])*
-            pub struct [< Js $t >]([< Js $parent >]);
-
-            impl [< Js $t >] {
-                pub fn is<T: Subclass<[< Js $t >]>>(&self) -> bool {
-                    T::is_instance(self)
-                }
-
-                pub fn downcast<T: Subclass<[< Js $t >]>>(&self) -> Option<<T as Class<[< Js $t >]>>::Owned> {
-                    T::try_from_super(self.clone())
-                }
-            }
-
-            // implement Deref<Target = Parent> for Self
-            impl Deref for [< Js $t >] {
-                type Target = [< Js $parent >];
-                fn deref(&self) -> &Self::Target {
-                    &self.0
-                }
-            }
-
-            // implement Class<Self> for Self
-            impl private::Sealed for [< Js $t >] {}
-            impl Class<[< Js $t >]> for [< Js $t >] {
-                type Owned = Self;
-                fn as_ref(&self) -> &[< Js $t >] {
-                    self
-                }
-            }
-
-            // implement Class<Parent> for Self
-            impl Class<[< Js $parent >]> for [< Js $t >] {
-                type Owned = Self;
-                fn as_ref(&self) -> &[< Js $parent >] {
-                    &self.0
-                }
-            }
-            impl From<[< Js $t >]> for [< Js $parent >] {
-                fn from(value: [< Js $t >]) -> Self {
-                    value.0
-                }
-            }
-
-            // implement Subclass<Parent> for Self
-            impl Subclass<[< Js $parent >]> for [< Js $t >] {
-                fn is_instance(value: &[< Js $parent >]) -> bool {
-                    $(
-                        if value.object_type().name() != $type {
-                            return false;
-                        }
-                    )?
-                    $(
-                        let subtype = value.object_type()
-                            .object_subtype()
-                            .map(|subtype| subtype.name());
-                        if !helper::SubtypePattern::matches($subtype, subtype) {
-                            return false;
-                        }
-                    )?
-                    $(
-                        let class = value.object_class();
-                        if !helper::ClassPattern::matches($class, class) {
-                            return false;
-                        }
-                    )?
-                    true
-                }
-
-                fn from_super(value: [< Js $parent >]) -> <Self as Class<[< Js $parent >]>>::Owned {
-                    Self(value)
-                }
-            }
-
-            impl TryFrom<[< Js $parent >]> for [< Js $t >] {
-                type Error = [< Js $parent >];
-                fn try_from(value: [< Js $parent >]) -> Result<Self, Self::Error> {
-                    Self::try_from_super(value.clone())
-                        .ok_or(value)
-                }
-            }
-
-            $($(
-                // implement Class<Ancestor> for Self
-                impl Class<[< Js $ancestor >]> for [< Js $t >] {
-                    type Owned = Self;
-                    fn as_ref(&self) -> &[< Js $ancestor >] {
-                        &self.0
-                    }
-                }
-                impl From<[< Js $t >]> for [< Js $ancestor >] {
-                    fn from(value: [< Js $t >]) -> Self {
-                        [< Js $parent >]::from(value).into()
-                    }
-                }
-
-                // implement Subclass<Ancestor> for Self
-                impl Subclass<[< Js $ancestor >]> for [< Js $t >] {
-                    fn is_instance(value: &[< Js $ancestor >]) -> bool {
-                        [< Js $parent >]::is_instance(value)
-                    }
-                    fn from_super(value: [< Js $ancestor >]) -> <Self as Class<[< Js $ancestor >]>>::Owned {
-                        Self([< Js $parent >]::from_super(value))
-                    }
-                }
-                impl TryFrom<[< Js $ancestor >]> for [< Js $t >] {
-                    type Error = [< Js $ancestor >];
-                    fn try_from(value: [< Js $ancestor >]) -> Result<Self, Self::Error> {
-                        Self::try_from_super(value.clone())
-                            .ok_or(value)
-                    }
-                }
-            )+)?
-
-            // implement Serialize and Deserialize for Self
-            impl serde::Serialize for [< Js $t >] {
-                fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                    self.0.serialize(serializer)
-                }
-            }
-            impl<'de> serde::Deserialize<'de> for [< Js $t >] {
-                fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                    let parent = [< Js $parent >]::deserialize(deserializer)?;
-                    let this = Self::try_from(parent)
-                        .map_err(|_| 
-                            D::Error::custom(format!("Failed to convert {} to {}", stringify!([< Js $parent>]), stringify!([< Js $t >])))
-                        )?;
-                    Ok(this)
-                }
-            }
-
-            // implement JsonSchema for Self
-            impl schemars::JsonSchema for [< Js $t >] {
-                fn schema_name() -> std::borrow::Cow<'static, str> {
-                    std::borrow::Cow::Borrowed(stringify!([< Js $t >]))
-                }
-                fn schema_id() -> std::borrow::Cow<'static, str> {
-                    std::borrow::Cow::Borrowed(::core::concat!(
-                        ::core::module_path!(),
-                        "::",
-                        stringify!([< Js $t >])
-                    ))
-                }
-                fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                    #[allow(unused_mut)]
-                    let mut parent_schema = [< Js $parent >]::json_schema(generator);
-
-                    #[allow(unused_mut)]
-                    let mut properties = parent_schema.ensure_object()
-                        ["properties"]
-                        [helper::JS_REMOTE_KEY]
-                        ["properties"]
-                        .as_object_mut()
-                        .unwrap();
-                    $(
-                        properties["type"]["enum"] = serde_json::json!([$type]);
-                    )?
-                    $(
-                        properties["subtype"] = helper::SubtypePattern::to_schema($subtype);
-                    )?
-
-                    let remove_node_id = {
-                        if properties["type"]["enum"].as_array_mut()
-                            .unwrap()
-                            .contains(&serde_json::json!("object")) {
-                            if let Some(subtype) = properties["subtype"]["enum"].as_array() {
-                                !subtype.contains(&serde_json::json!("node"))
-                            } else {
-                                true
-                            }
-                        } else {
-                            false
-                        }
-                    };
-                    if remove_node_id {
-                        properties.remove("nodeId");
-                        properties.remove("backendNodeId");
-                    }
-                    parent_schema
-                }
-            }
-
-            
-
-            // implement javascript properties
-            $(
-                impl [< Js $t >] {
-                    define_js_properties!($properties);
-                }
-            )?
-
-            // implement javascript methods
-            $(
-                impl [< Js $t >] {
-                    define_js_methods!($methods);
-                }
-            )?
-        }
-    };
-}
-
-pub(crate) use define_js_remote_object;
-pub(crate) use define_js_properties;
-pub(crate) use define_js_methods;
 

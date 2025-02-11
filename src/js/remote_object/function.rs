@@ -1,11 +1,14 @@
 use super::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function
     class Function {
         static #type: "function";
 
         properties: {
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor
+            constructor: JsFunction [readonly];
+
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name
             name: String [readonly];
 
@@ -16,7 +19,7 @@ define_js_remote_object!(
             length: usize [readonly];
 
             //// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/prototype
-            //prototype: Option<JsObject> [readonly];
+            prototype: Option<JsObject> [readonly];
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString

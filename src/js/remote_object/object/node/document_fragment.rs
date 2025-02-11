@@ -4,7 +4,7 @@ pub mod shadow_root;
 
 pub use shadow_root::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment
     class DocumentFragment extends Node inherits Object {
         static #class: ["DocumentFragment", "ShadowRoot"];

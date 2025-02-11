@@ -33,45 +33,151 @@ use serde_json::Value as JsonValue;
 use std::marker::PhantomData;
 use serde::{Serialize, Deserialize, de::DeserializeSeed};
 
-use crate::error::CdpError;
+use crate::error::{CdpError, Result};
 use crate::listeners::EventStream;
 use crate::utils::evaluation_string;
-use crate::{error::Result, Page};
 use crate::handler::PageInner;
-use super::native_value::{NativeValueFromJs, NativeValueIntoJs, FunctionNativeArgsFromJs};
+use crate::page::Page;
 use crate::js::de::PageDeserializeSeed;
-use super::*;
+use crate::js::{NativeValueFromJs, NativeValueIntoJs, FunctionNativeArgsFromJs, EvalParams, js_expr_str};
 
-#[cfg(feature = "tokio-runtime")]
-type Scope<'a, T = ()> = async_scoped::TokioScope<'a, T>;
-#[cfg(feature = "async-std-runtime")]
-type Scope<'a, T = ()> = async_scoped::AsyncStdScope<'a, T>;
+/// Trait for functions that can be exposed to JavaScript.
+///
+/// This trait is implemented for Rust functions that can be called from JavaScript.
+/// The implementation handles:
+/// - Converting JavaScript arguments to Rust types
+/// - Converting Rust return values to JavaScript
+/// - Error handling and propagation
+/// - Async/sync function support
+///
+/// # Function Signature
+/// ```ignore
+/// async? fn exposable_fn<M, E, R, A1, A2, ..., AN>(
+///     arg1: A1,
+///     arg2: A2,
+///     ...
+///     argN: AN,
+/// ) -> Result<R, E>
+/// where
+///     M: Marker for both sync and async functions
+///     E: Display + Debug + Send + Sync
+///     R: NativeValueIntoJs
+///     A1: NativeValueFromJs
+///     A2: NativeValueFromJs
+///     ...
+///     AN: NativeValueFromJs
+/// ```
+///
+/// # Type Parameters
+/// - `M`: Marker type for function kind:
+///   - `()` for synchronous functions
+///   - `ExposableFnAsyncMarker` for async functions
+/// - `E`: Error type that implements `Display + Debug + Send + Sync`
+/// - `R`: Return type that implements `NativeValueIntoJs`
+/// - `Args`: Argument types that implement `NativeValueFromJs`
+///
+/// # Requirements
+/// - Function must be `Send + Sync` for thread safety
+/// - Arguments must implement `NativeValueFromJs` for safe deserialization from JavaScript values
+/// - Return type must be `Result<T, E>` where:
+///   - `T` implements `NativeValueIntoJs` for serialization to JavaScript
+///   - `E` implements `ExposableFnError` for error handling
+/// 
+pub trait ExposableFn<M, E, R, A>: private::Sealed<M, E, R, A> + Send + Sync {}
+impl<F, M, E, R, A> ExposableFn<M, E, R, A> for F
+where F: private::Sealed<M, E, R, A> + Send + Sync {}
 
-/// Represents a Rust function that has been exposed to JavaScript.
+/// A trait for error types that can be safely propagated to JavaScript.
+/// 
+/// This trait is automatically implemented for any type that implements:
+/// - `std::fmt::Display` for formatting the error message
+/// - `std::fmt::Debug` for debug information
+/// - `Send + Sync` for thread safety
+/// 
+/// When a function exposed to JavaScript returns an `Err`, the error message
+/// will be converted to a JavaScript Error object.
+pub trait ExposableFnError: std::fmt::Display + std::fmt::Debug + Send + Sync {}
+impl<E> ExposableFnError for E where E: std::fmt::Display + std::fmt::Debug + Send + Sync {}
+
+/// Represents a Rust function that has been exposed to the JavaScript runtime.
 ///
-/// This type manages the lifecycle of an exposed function, including:
-/// - Registration in the JavaScript environment
-/// - Handling function calls from JavaScript
-/// - Cleanup when the function is dropped
+/// This type serves as a handle to a Rust function that has been registered in the JavaScript
+/// environment. It manages the function's lifecycle in the JavaScript runtime, including:
+/// - Registration and initialization in the JavaScript global scope
+/// - Handling incoming function calls from JavaScript
+/// - Automatic cleanup when the handle is dropped
 ///
-/// The function remains available in JavaScript until this object is dropped.
-pub struct ExposedFunction<'a> {
-    shared: Arc<Shared<'a>>,
-    _scope: Scope<'a>,
+/// The exposed function remains callable from JavaScript as long as this handle is alive.
+/// Once the handle is dropped, the function is automatically unregistered from the JavaScript
+/// environment.
+///
+/// # Lifetime
+/// The lifetime parameter `'f` represents how long the underlying Rust function
+/// must remain valid. The function must live at least as long as this handle.
+///
+/// # Example
+/// ```no_run
+/// # use chromiumoxide::page::Page;
+/// # use chromiumoxide::error::Result;
+/// # async fn example(page: &Page) -> Result<()> {
+/// let handle = page.expose_function(
+///     "add",
+///     |a: i32, b: i32| -> Result<i32, std::convert::Infallible> {
+///         Ok(a + b)
+///     }
+/// ).await?;
+/// 
+/// // Function is available in JavaScript while `handle` is alive
+/// // When `handle` is dropped, the function is removed from JavaScript
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone)]
+pub struct ExposedFunction<'f>(Arc<ExposedFunctionInner<'f>>);
+
+impl<'f> ExposedFunction<'f> {
+    /// Returns the name of the callback as registered in the browser.
+    pub fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    pub(crate) async fn new<T, M, E, R, A>(name: String, page: Arc<PageInner>, callback: T) -> Result<Self>
+    where
+        T: ExposableFn<M, E, R, A> + 'f,
+        M: 'f,
+        E: ExposableFnError + 'f,
+        R: NativeValueIntoJs + 'f,
+        for<'a> A: FunctionNativeArgsFromJs + 'a,
+    {
+        let inner = ExposedFunctionInner::new(name, page, callback).await?;
+        Ok(Self(Arc::new(inner)))
+    }
 }
 
-impl<'a> ExposedFunction<'a> {
-    pub(crate) async fn new<T, K, E, R, A>(
-        name: String,
-        page: Arc<PageInner>,
-        callback: T
-    ) -> Result<Self>
+impl<'f> AsRef<str> for ExposedFunction<'f> {
+    fn as_ref(&self) -> &str {
+        self.0.name()
+    }
+}
+
+#[cfg(feature = "tokio-runtime")]
+type Scope<'f, T = ()> = async_scoped::TokioScope<'f, T>;
+#[cfg(feature = "async-std-runtime")]
+type Scope<'f, T = ()> = async_scoped::AsyncStdScope<'f, T>;
+
+struct ExposedFunctionInner<'f> {
+    shared: Arc<Shared<'f>>,
+    _scope: Scope<'f>,
+}
+
+impl<'f> ExposedFunctionInner<'f> {
+    async fn new<F, M, E, R, A>(name: String, page: Arc<PageInner>, callback: F) -> Result<Self>
     where
-        T: CallbackAdapter<K, E, R, A> + 'a,
-        K: 'static,
-        E: JsCallbackError,
-        R: NativeValueIntoJs + 'a,
-        A: FunctionNativeArgsFromJs + 'a,
+        F: ExposableFn<M, E, R, A> + 'f,
+        M: 'f,
+        E: ExposableFnError + 'f,
+        R: NativeValueIntoJs + 'f,
+        for<'a> A: FunctionNativeArgsFromJs + 'a,
     {
         // Ensure the CDP binding is available
         ensure_binding(&page, &*CDP_BINDING_NAME).await?;
@@ -90,7 +196,7 @@ impl<'a> ExposedFunction<'a> {
         ).await?.result.identifier;
 
         // Create the shared state
-        let adapter = Box::new(WrappedAdapter(Box::new(callback)));
+        let adapter = Box::new(BoxedFn(Box::new(callback)));
         let shared = Arc::new(Shared {
             name,
             page,
@@ -111,14 +217,13 @@ impl<'a> ExposedFunction<'a> {
         Ok(Self { shared, _scope: scope })
     }
 
-    /// Returns the name of the callback as registered in the browser.
-    pub fn name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.shared.name
     }
 }
 
 /// Automatically removes the function from JavaScript when dropped.
-impl<'a> Drop for ExposedFunction<'a> {
+impl<'f> Drop for ExposedFunctionInner<'f> {
     fn drop(&mut self) {
         let _ = self.shared.page.execute_no_wait(
             RemoveScriptToEvaluateOnNewDocumentParams::builder()
@@ -128,9 +233,9 @@ impl<'a> Drop for ExposedFunction<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for ExposedFunction<'a> {
+impl<'f> std::fmt::Debug for ExposedFunctionInner<'f> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Callback {{ name: {}, function: <function> }}", self.shared.name)
+        write!(f, "ExposedFunction {{ name: {}, function: <function> }}", self.shared.name)
     }
 }
 
@@ -138,18 +243,18 @@ impl<'a> std::fmt::Debug for ExposedFunction<'a> {
 /// 
 /// This struct holds the data needed to manage the callback's lifecycle
 /// and handle invocations from the browser.
-struct Shared<'a> {
+struct Shared<'f> {
     /// The name of the callback as registered in JavaScript
     name: String,
     /// The page context where the callback is registered
     page: Arc<PageInner>,
     /// The adapter that wraps the actual callback function
-    adapter: BoxedAdapter<'a>,
+    adapter: BoxedErasedFn<'f>,
     /// The script identifier for the callback
     script: ScriptIdentifier,
 }
 
-impl<'a> Shared<'a> {
+impl<'f> Shared<'f> {
     /// Runs the event loop that handles callback invocations from the browser.
     async fn run(self: Arc<Self>, listener: EventStream<EventBindingCalled>) {
         use futures::StreamExt as _;
@@ -168,7 +273,8 @@ impl<'a> Shared<'a> {
     }
 
     /// Handles a binding call event from the browser.
-    async fn on_binding_called(&self, event: &EventBindingCalled) {
+    async fn on_binding_called(&self, event: &EventBindingCalled)
+    {
         if event.name != *CDP_BINDING_NAME {
             return;
         }
@@ -189,14 +295,14 @@ impl<'a> Shared<'a> {
                             None
                         ).await;
                     }
-                    Err(e) => {
+                    Err(errmsg) => {
                         let _ = set_result(
                             self.page.clone(),
                             &self.name,
                             payload.seq,
                             event.execution_context_id,
                             None,
-                            Some(e.0.to_string())
+                            Some(errmsg)
                         ).await;
                     }
                 }
@@ -208,20 +314,20 @@ impl<'a> Shared<'a> {
     }
 
     /// Invokes the callback with arguments from JavaScript.
-    async fn invoke(&self, seq: u64, execution_context_id: ExecutionContextId) -> Result<JsonValue, JsCallbackErrorWrapper> {
+    async fn invoke(&self, seq: u64, execution_context_id: ExecutionContextId) -> Result<JsonValue, String> {
         let args = get_arguments(
             self.page.clone(),
             &self.name,
             seq,
             execution_context_id,
-            self.adapter.args_schema()
-        ).await?;
+            self.adapter.arguments_schema()
+        ).await.map_err(|e| e.to_string())?;
 
-        let result = self.adapter.call(
-            self.page.clone(),
-            args
-        ).await?;
-        Ok(result)
+        let result = self.adapter.invoke_from_javascript(self.page.clone(), args).await;
+        match result {
+            Ok(result) => Ok(result),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }
 
@@ -286,90 +392,64 @@ struct CallbackPayload {
     seq: u64,
 }
 
-/// Trait for errors that can be returned from JavaScript callbacks.
-pub trait JsCallbackError: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static {}
-impl<T: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static> JsCallbackError for T {}
-
-/// Wrapper type for JavaScript callback errors.
-#[derive(Debug)]
-pub struct JsCallbackErrorWrapper(Box<dyn JsCallbackError>);
-
-impl<T> From<T> for JsCallbackErrorWrapper
-where
-    T: JsCallbackError
-{
-    fn from(value: T) -> Self {
-        Self(Box::new(value))
-    }
-}
-
-/// Trait for adapting Rust functions to JavaScript callbacks.
-#[async_trait::async_trait]
-pub trait CallbackAdapter<K, E, R, A>: Send + Sync {
-    async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper>;
-    fn args_schema(&self) -> Schema;
-}
-
 /// Internal trait for type-erased callback adapters.
 #[async_trait::async_trait]
-trait ErasedAdapter: Send + Sync {
-    async fn call(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper>;
-    fn args_schema(&self) -> Schema;
+trait ErasedFn: Send + Sync {
+    async fn invoke_from_javascript(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, String>;
+    fn arguments_schema(&self) -> Schema;
 }
-
-type BoxedAdapter<'a> = Box<dyn ErasedAdapter + 'a>;
+type BoxedErasedFn<'f> = Box<dyn ErasedFn + 'f>;
 
 /// Wrapper that adapts a concrete callback type to the erased trait.
-struct WrappedAdapter<'a, K, E, R, A>(
-    Box<dyn CallbackAdapter<K, E, R, A> + 'a>
+struct BoxedFn<'f, M, E, R, A>(
+    Box<dyn ExposableFn<M, E, R, A> + 'f>
 );
 
 #[async_trait::async_trait]
-impl<'a, K, E, R, A> ErasedAdapter for WrappedAdapter<'a, K, E, R, A> {
-    async fn call(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper> {
-        self.0.call(page.into(), args).await
+impl<'f, M, E, R, A> ErasedFn for BoxedFn<'f, M, E, R, A>
+where
+    A: FunctionNativeArgsFromJs,
+{
+    async fn invoke_from_javascript(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+        self.0.invoke_from_javascript(page.into(), args).await
     }
-    fn args_schema(&self) -> Schema {
-        self.0.args_schema()
+    fn arguments_schema(&self) -> Schema {
+        self.0.arguments_schema()
     }
 }
 
-/// Marker type for synchronous callbacks.
+/// Marker type for exposable async functions.
 #[derive(Debug, Clone, Copy)]
-pub struct CallKindSync;
+pub struct ExposableFnAsyncMarker;
 
-/// Marker type for asynchronous callbacks.
-#[derive(Debug, Clone, Copy)]
-pub struct CallKindAsync;
-
-macro_rules! impl_callback_adapter {
+macro_rules! impl_exposable_fn {
     (
         $($ty:ident),*
     ) => {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<F, E, R, $($ty,)*> CallbackAdapter<CallKindSync, E, R, ($($ty,)*)> for F
+            impl<'f, F, E, R, $($ty,)*> private::Sealed<(), E, R, ($($ty,)*)> for F
             where
-                F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync,
-                E: JsCallbackError,
-                R: NativeValueIntoJs,
-                $( $ty: NativeValueFromJs,)*
+                F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync + 'f,
+                E: ExposableFnError + 'f,
+                R: NativeValueIntoJs + 'f,
+                $( for<'a> $ty: NativeValueFromJs + 'a,)*
             {
-                async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper> {
-                    let page_inner = page.into_inner();
+                async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+                    let page: Arc<PageInner> = page.into();
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageDeserializeSeed::new(page_inner.clone(), PhantomData);
-                        let [< $ty:lower >] = seed.deserialize(json)?;
+                        let seed = PageDeserializeSeed::new(page.clone(), PhantomData);
+                        let [< $ty:lower >] = seed.deserialize(json).map_err(|e| e.to_string())?;
                     )*
 
-                    let result = self($([< $ty:lower >],)*)?;
-                    let json = serde_json::to_value(result)?;
+                    let result = self($([< $ty:lower >],)*).map_err(|e| e.to_string())?;
+                    let json = serde_json::to_value(result).map_err(|e| e.to_string())?;
                     Ok(json)
                 }
-                fn args_schema(&self) -> Schema {
+                fn arguments_schema(&self) -> Schema {
                     let schema = {
                         let mut settings = schemars::generate::SchemaSettings::default();
                         settings.inline_subschemas = true;
@@ -382,47 +462,47 @@ macro_rules! impl_callback_adapter {
     };
 }
 
-impl_callback_adapter!();
-impl_callback_adapter!(A1);
-impl_callback_adapter!(A1, A2);
-impl_callback_adapter!(A1, A2, A3);
-impl_callback_adapter!(A1, A2, A3, A4);
-impl_callback_adapter!(A1, A2, A3, A4, A5);
-impl_callback_adapter!(A1, A2, A3, A4, A5, A6);
-impl_callback_adapter!(A1, A2, A3, A4, A5, A6, A7);
-impl_callback_adapter!(A1, A2, A3, A4, A5, A6, A7, A8);
-impl_callback_adapter!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
-impl_callback_adapter!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
+impl_exposable_fn!();
+impl_exposable_fn!(A1);
+impl_exposable_fn!(A1, A2);
+impl_exposable_fn!(A1, A2, A3);
+impl_exposable_fn!(A1, A2, A3, A4);
+impl_exposable_fn!(A1, A2, A3, A4, A5);
+impl_exposable_fn!(A1, A2, A3, A4, A5, A6);
+impl_exposable_fn!(A1, A2, A3, A4, A5, A6, A7);
+impl_exposable_fn!(A1, A2, A3, A4, A5, A6, A7, A8);
+impl_exposable_fn!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
+impl_exposable_fn!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 
-macro_rules! impl_callback_adapter_async {
+macro_rules! impl_exposable_fn_async {
     (
         $($ty:ident),*
     ) => {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<F, Fut, E, R, $($ty,)*> CallbackAdapter<CallKindAsync, E, R, ($($ty,)*)> for F
+            impl<'f, F, Fut, E, R, $($ty,)*> private::Sealed<ExposableFnAsyncMarker, E, R, ($($ty,)*)> for F
             where
-                F: (Fn($($ty,)*) -> Fut) + Send + Sync,
-                Fut: futures::Future<Output = Result<R, E>> + Send,
-                E: JsCallbackError,
-                R: NativeValueIntoJs,
-                $( $ty: NativeValueFromJs,)*
+                F: (Fn($($ty,)*) -> Fut) + Send + Sync + 'f,
+                Fut: futures::Future<Output = Result<R, E>> + Send + 'f,
+                E: ExposableFnError + 'f,
+                R: NativeValueIntoJs + 'f,
+                $( for<'a> $ty: NativeValueFromJs + 'a,)*
             {
-                async fn call(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, JsCallbackErrorWrapper> {
-                    let page_inner = page.into_inner();
+                async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+                    let page: Arc<PageInner> = page.into();
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageDeserializeSeed::new(page_inner.clone(), PhantomData);
-                        let [< $ty:lower >] = seed.deserialize(json)?;
+                        let seed = PageDeserializeSeed::new(page.clone(), PhantomData);
+                        let [< $ty:lower >] = seed.deserialize(json).map_err(|e| e.to_string())?;
                     )*
 
-                    let result = self($([< $ty:lower >],)*).await?;
-                    let json = serde_json::to_value(result)?;
+                    let result = self($([< $ty:lower >],)*).await.map_err(|e| e.to_string())?;
+                    let json = serde_json::to_value(result).map_err(|e| e.to_string())?;
                     Ok(json)
                 }
-                fn args_schema(&self) -> Schema {
+                fn arguments_schema(&self) -> Schema {
                     let schema = {
                         let mut settings = schemars::generate::SchemaSettings::default();
                         settings.inline_subschemas = true;
@@ -430,22 +510,23 @@ macro_rules! impl_callback_adapter_async {
                     };
                     schema
                 }
+
             }
         }
     };
 }
 
-impl_callback_adapter_async!();
-impl_callback_adapter_async!(A1);
-impl_callback_adapter_async!(A1, A2);
-impl_callback_adapter_async!(A1, A2, A3);
-impl_callback_adapter_async!(A1, A2, A3, A4);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7, A8);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
-impl_callback_adapter_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
+impl_exposable_fn_async!();
+impl_exposable_fn_async!(A1);
+impl_exposable_fn_async!(A1, A2);
+impl_exposable_fn_async!(A1, A2, A3);
+impl_exposable_fn_async!(A1, A2, A3, A4);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5, A6);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5, A6, A7);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5, A6, A7, A8);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
+impl_exposable_fn_async!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 
 static CDP_BINDING_NAME: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     random_string(rand::thread_rng().gen_range(30..50))
@@ -470,8 +551,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
         value: String,
     }
 
-
-    const GET_BINDING_DESC: &'static str = js!(
+    const GET_BINDING_DESC: &'static str = js_expr_str!(
         (name) => {
             let descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
             if (descriptor) {
@@ -504,7 +584,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
     };
 
     if descriptor.enumerable {
-        const SET_BINDING_ENUMERABLE: &'static str = js!(
+        const SET_BINDING_ENUMERABLE: &'static str = js_expr_str!(
             (name) => {
                 Object.defineProperty(globalThis, name, {
                     enumerable: false,
@@ -517,4 +597,14 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
             .invoke::<()>().await?;
     }
     Ok(())
+}
+
+mod private {
+    use super::*;
+
+    #[async_trait::async_trait]
+    pub trait Sealed<M, E, R, A> {
+        async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String>;
+        fn arguments_schema(&self) -> Schema;
+    }
 }

@@ -450,17 +450,17 @@ impl PageInner {
         evaluator.invoke(this)
     }
 
-    pub async fn expose_function<'a, F, K, E, R, A>(
+    pub async fn expose_function<'f, F, M, E, R, A>(
         self: &Arc<Self>,
         name: impl Into<String>,
         function: F,
-    ) -> Result<js::ExposedFunction<'a>>
+    ) -> Result<js::ExposedFunction<'f>>
     where 
-        F: js::CallbackAdapter<K, E, R, A> + 'a,
-        K: 'static,
-        E: js::JsCallbackError,
-        R: js::NativeValueIntoJs + 'a,
-        A: js::FunctionNativeArgsFromJs + 'a,
+        F: js::ExposableFn<M, E, R, A> + 'f,
+        M: 'f,
+        E: js::ExposableFnError + 'f,
+        R: js::NativeValueIntoJs + 'f,
+        for<'a> A: js::FunctionNativeArgsFromJs + 'a,
     {
         js::ExposedFunction::new(
             name.into(),

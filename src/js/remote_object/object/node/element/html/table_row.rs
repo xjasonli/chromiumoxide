@@ -1,6 +1,6 @@
 use super::*;
 
-define_js_remote_object!(
+js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLTableRowElement
     class HtmlTableRowElement extends HtmlElement inherits Element, Node, Object {
         static #class: "HTMLTableRowElement";
