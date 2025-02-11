@@ -337,7 +337,7 @@ js_remote_object!(
 
             /// Extension method
             queryXpath(xpath: &str) -> Option<JsNode> {
-                let result = this.evaluate(xpath, null, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 for (let i = 0; i < result.snapshotLength; i++) {
                     let node = result.snapshotItem(i);
                     if (node) {
@@ -349,7 +349,7 @@ js_remote_object!(
 
             /// Extension method
             queryXpathAll(xpath: &str) -> Vec<JsNode> {
-                let result = this.evaluate(xpath, null, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 let nodes = [];
                 for (let i = 0; i < result.snapshotLength; i++) {
                     let node = result.snapshotItem(i);
