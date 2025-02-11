@@ -21,13 +21,13 @@ type JsonPointerRef<'a> = &'a [JsonPointerSegment];
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum JsonPointerSegment {
-    Entry(String),
+    Field(String),
     Index(usize),
 }
 
 impl From<String> for JsonPointerSegment {
     fn from(s: String) -> Self {
-        JsonPointerSegment::Entry(s)
+        JsonPointerSegment::Field(s)
     }
 }
 impl From<usize> for JsonPointerSegment {
@@ -37,7 +37,7 @@ impl From<usize> for JsonPointerSegment {
 }
 impl From<&str> for JsonPointerSegment {
     fn from(s: &str) -> Self {
-        JsonPointerSegment::Entry(s.to_string())
+        JsonPointerSegment::Field(s.to_string())
     }
 }
 
@@ -91,7 +91,7 @@ mod utils {
                     } else {
                         for (key, val) in obj.iter_mut() {
                             let mut new_path = current.clone();
-                            new_path.push(JsonPointerSegment::Entry(key.clone()));
+                            new_path.push(JsonPointerSegment::Field(key.clone()));
                             split_impl(val, new_path, paths, specials);
                         }
                     }
@@ -123,24 +123,33 @@ mod utils {
             path: JsonPointerRef<'_>,
             special: SpecialValue
         ) -> crate::error::Result<()> {
-            use std::ops::IndexMut;
-
             if path.is_empty() {
                 *json = special.into_json()?;
             } else {
                 match &path[0] {
-                    JsonPointerSegment::Entry(s) => {
+                    JsonPointerSegment::Field(s) => {
                         if !json.is_object() {
                             *json = serde_json::json!({});
                         }
-                        let attr = json.index_mut(s);
-                        merge_impl(attr, &path[1..], special)?;
+                        let object = json.as_object_mut().unwrap();
+                        if !object.contains_key(s) {
+                            object.insert(s.to_string(), serde_json::Value::Null);
+                        }
+
+                        let prop = object.get_mut(s).unwrap();
+                        merge_impl(prop, &path[1..], special)?;
                     }
                     JsonPointerSegment::Index(n) => {
                         if !json.is_array() {
                             *json = serde_json::json!([]);
                         }
-                        let item = json.index_mut(n);
+
+                        let array = json.as_array_mut().unwrap();
+                        if array.len() <= *n {
+                            array.resize(*n + 1, serde_json::Value::Null);
+                        }
+
+                        let item = array.get_mut(*n).unwrap();
                         merge_impl(item, &path[1..], special)?;
                     }
                 }

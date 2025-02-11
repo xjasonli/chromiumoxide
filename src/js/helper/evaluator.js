@@ -52,7 +52,7 @@
             const segment = path[0];
             if (typeof segment === 'string' && typeof value !== 'object') {
                 value = {};
-            } else if (typeof segment === 'number' && !Array.isArray(value)) {
+            } else if (typeof segment === 'number' && !isArray(value)) {
                 value = [];
             }
             value[segment] = mergeSpecial(value[segment], path.slice(1), special, expressions);
@@ -111,6 +111,15 @@
             return null;
         }
 
+        // cross-realm compatible way to check if `value` is an array
+        const isArray = (value) => {
+            return typeof value === 'object' && value !== null &&
+                   typeof value.length === 'number' &&
+                   typeof value.splice === 'function' &&
+                   typeof value.slice === 'function' &&
+                   value.constructor.name === 'Array';
+        }
+
         // validate the `value` using `schema` and collect all `RemoteObject`
         // specified by `schema` from `value`
         //
@@ -118,21 +127,58 @@
         // - `value`: the source value
         // - `schema`: the schema
         // - `currentPath`: the current path
-        // - `outSpecials`: the collected specials
-        // - `outPaths`: the paths of the collected specials
         //
         // returns:
-        // - boolean: whether the `value` matches the `schema`
+        // {
+        //     // the error information when validation failed
+        //     error?: {
+        //         // the value causing the error
+        //         value?: any,
+        //
+        //         // the path where validation failed
+        //         path: (string|number)[],
+        //
+        //         // the error message when validation failed
+        //         message: string,
+        //     },
+        //
+        //     // the collected specials and their paths
+        //     specials?: ({
+        //         // the path of the special value
+        //         path: (string|number)[],
+        //
+        //         // the special value
+        //         value: any,
+        //     })[],
+        // }
         //
         function validateSchemaAndCollectSpecials(
-            value, schema, currentPath, outSpecials, outPaths
+            value, schema, currentPath
         ) {
             if (typeof schema !== 'boolean' && typeof schema !== 'object') {
-                throw new Error(`schema is not a valid schema`);
+                return {
+                    error: {
+                        value: value,
+                        path: currentPath,
+                        message: 'invalid schema: not a boolean or object'
+                    }
+                };
             }
 
             if (typeof schema === 'boolean') {
-                return schema;
+                if (schema) {
+                    return {
+                        specials: []  // Always return empty array for successful validation
+                    };
+                } else {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'schema is `false`'
+                        }
+                    };
+                }
             }
 
             let oneOfSchemas = schema.oneOf || [];
@@ -143,277 +189,459 @@
                 schema.type = schema.type[0];
             }
 
-            let typesSpecials = [];  
-            let typesPaths = [];
+            let collectedSpecials = [];
             if (typeof schema.type === 'string') {
-                if (schema.type === 'object') {
-                    const schemaSpecialType = getSchemaSpecialType(schema);
-                    if (schemaSpecialType !== null) {
-                        // validate for remote object
-                        const objectSpecialType = getObjectSpecialType(value);
-                        if (schemaSpecialType === objectSpecialType) {
-                            typesPaths.push(currentPath);
-                            typesSpecials.push(value);
-                        } else {
-                            return false;
-                        }
-                    } else {
-                        // validate for normal object
-                        if (typeof value !== 'object') {
-                            return false;
-                        }
-
-                        let processedProperties = new Set();
-                        let requiredProperties = new Set(schema.required || []);
-
-                        if (typeof schema.properties === 'object') {
-                            for (const [key, subSchema] of Object.entries(schema.properties)) {
-                                if (!requiredProperties.has(key)) {
-                                    if (typeof subSchema.type === 'string') {
-                                        subSchema.type = [subSchema.type];
-                                    }
-                                    subSchema.type.push('null');
-                                }
-
-                                if (!validateSchemaAndCollectSpecials(
-                                    value[key],
-                                    subSchema,
-                                    currentPath.concat([key]),
-                                    typesSpecials,
-                                    typesPaths
-                                )) {
-                                    return false;
-                                }
-                                processedProperties.add(key);
-                            }
-                        }
-                        if (schema.additionalProperties !== undefined) {
-                            for (const [key, val] of Object.entries(value)) {
-                                if (!processedProperties.has(key)) {
-                                    if (
-                                        !(typeof schema.additionalProperties === 'boolean') &&
-                                        !(typeof schema.additionalProperties === 'object')
-                                    ) {
-                                        return false;
-                                    }
-
-                                    if (!validateSchemaAndCollectSpecials(
-                                        val,
-                                        schema.additionalProperties,
-                                        currentPath.concat([key]),
-                                        typesSpecials,
-                                        typesPaths
-                                    )) {
-                                        return false;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if (schema.type === 'array') {
-                    if (!Array.isArray(value)) {
-                        return false;
-                    }
-                    let index = 0;
-                    if (typeof schema.minItems === 'number') {
-                        if (value.length < schema.minItems) {
-                            return false;
-                        }
-                    }
-                    if (typeof schema.maxItems === 'number') {
-                        if (value.length > schema.maxItems) {
-                            return false;
-                        }
-                    }
-                    if (Array.isArray(schema.prefixItems)) {
-                        for (let i = 0; i < schema.prefixItems.length; i++) {
-                            if (!validateSchemaAndCollectSpecials(
-                                value[i],
-                                schema.prefixItems[i],
-                                currentPath.concat([i]),
-                                typesSpecials,
-                                typesPaths
-                            )) {
-                                return false;
-                            }
-                        }
-                        index = schema.prefixItems.length;
-                    }
-                    if (typeof schema.items !== 'undefined') {
-                        for (let i = index; i < value.length; i++) {
-                            if (
-                                !(typeof schema.items === 'boolean') &&
-                                !(typeof schema.items === 'object')
-                            ) {
-                                return false;
-                            }
-
-                            if (!validateSchemaAndCollectSpecials(
-                                value[i],
-                                schema.items,
-                                currentPath.concat([i]),
-                                typesSpecials,
-                                typesPaths
-                            )) {
-                                return false;
-                            }
-                        }
-                    }
-                } else if (schema.type === 'string') {
-                    if (typeof value !== 'string' && !(value instanceof String)) {
-                        return false;
-                    }
-                } else if (schema.type === 'number') {
-                    if (typeof value !== 'number') {
-                        return false;
-                    }
-                } else if (schema.type === 'integer') {
-                    if (!Number.isInteger(value)) {
-                        return false;
-                    }
-                } else if (schema.type === 'boolean') {
-                    if (typeof value !== 'boolean') {
-                        return false;
-                    }
-                } else if (schema.type === 'null') {
-                    if (value !== null && value !== undefined) {
-                        return false;
-                    }
-                } else {
-                    return false;
+                let result = validateSimpleSchema(value, schema, currentPath);
+                if (result.error) {
+                    return result;
+                }
+                if (result.specials) {
+                    collectedSpecials.push(...result.specials);
                 }
             } else {
-                let typesSchemas = [];
+                let schemaList = [];
                 if (!Array.isArray(schema.type)) {
                     schema.type = ['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'];
                 }
-                for (const type of schema.type) {
-                    if (typeof type === 'string') {
+                for (const schemaType of schema.type) {
+                    if (typeof schemaType === 'string') {
                         let newSchema = structuredClone(schema);
-                        newSchema.type = type;
-                        typesSchemas.push(newSchema);
+                        newSchema.type = schemaType;
+                        newSchema.oneOf = undefined;
+                        newSchema.anyOf = undefined;
+                        newSchema.allOf = undefined;
+                        schemaList.push(newSchema);
                     } else {
-                        throw new Error(`unknown type ${type}`);
+                        return {
+                            error: {
+                                path: currentPath,
+                                message: `invalid schema: unknown type ${schemaType}`
+                            }
+                        };
                     }
                 }
 
-                if (!validateSchemaList('any', value, typesSchemas, currentPath, typesSpecials, typesPaths)) {
-                    return false;
+                const result = validateSchemaList('any', value, schemaList, currentPath);
+                if (result.error) {
+                    return result;
+                }
+                if (result.specials) {
+                    collectedSpecials.push(...result.specials);
                 }
             }
 
-            let oneOfSpecials = [];
-            let oneOfPaths = [];
-            if (!validateSchemaList('one', value, oneOfSchemas, currentPath, oneOfSpecials, oneOfPaths)) {
-                return false;
+            const oneOfResult = validateSchemaList('one', value, oneOfSchemas, currentPath);
+            if (oneOfResult.error) {
+                return oneOfResult;
+            }
+            if (oneOfResult.specials) {
+                collectedSpecials.push(...oneOfResult.specials);
             }
 
-            let anyOfSpecials = [];
-            let anyOfPaths = [];
-            if (!validateSchemaList('any', value, anyOfSchemas, currentPath, anyOfSpecials, anyOfPaths)) {
-                return false;
+            const anyOfResult = validateSchemaList('any', value, anyOfSchemas, currentPath);
+            if (anyOfResult.error) {
+                return anyOfResult;
+            }
+            if (anyOfResult.specials) {
+                collectedSpecials.push(...anyOfResult.specials);
             }
 
-            let allOfSpecials = [];
-            let allOfPaths = [];
-            if (!validateSchemaList('all', value, allOfSchemas, currentPath, allOfSpecials, allOfPaths)) {
-                return false;
+            const allOfResult = validateSchemaList('all', value, allOfSchemas, currentPath);
+            if (allOfResult.error) {
+                return allOfResult;
+            }
+            if (allOfResult.specials) {
+                collectedSpecials.push(...allOfResult.specials);
             }
 
-            outSpecials.push(...typesSpecials);
-            outPaths.push(...typesPaths);
-            outSpecials.push(...oneOfSpecials);
-            outPaths.push(...oneOfPaths);
-            outSpecials.push(...anyOfSpecials);
-            outPaths.push(...anyOfPaths);
-            outSpecials.push(...allOfSpecials);
-            outPaths.push(...allOfPaths);
-            return true;
+            return {
+                specials: collectedSpecials
+            };
+        }
+
+        // validate the `value` using `schema` and collect all `RemoteObject`
+        //
+        // schema is a simple schema, which has `type` with no list of schemas,
+        // and discards `anyOf`, `oneOf`, `allOf`.
+        function validateSimpleSchema(value, schema, currentPath) {
+            let collectedSpecials = [];
+            if (schema.type === 'object') {
+                const schemaSpecialType = getSchemaSpecialType(schema);
+                if (schemaSpecialType !== null) {
+                    // validate for remote object
+                    const objectSpecialType = getObjectSpecialType(value);
+                    if (schemaSpecialType === objectSpecialType) {
+                        collectedSpecials.push({
+                            path: currentPath,
+                            value: value
+                        });
+                    } else {
+                        return {
+                            error: {
+                                value: value,
+                                path: currentPath,
+                                message: `not a special type: ${schemaSpecialType}`
+                            }
+                        };
+                    }
+                } else {
+                    // validate for normal object
+                    if (typeof value !== 'object' || value === null || isArray(value)) {
+                        return {
+                            error: {
+                                value: value,
+                                path: currentPath,
+                                message: 'not an object'
+                            }
+                        };
+                    }
+
+                    let processedProperties = new Set();
+                    let requiredProperties = new Set(schema.required || []);
+
+                    if (typeof schema.properties === 'object') {
+                        for (const [key, subSchema] of Object.entries(schema.properties)) {
+                            if (!requiredProperties.has(key)) {
+                                if (typeof subSchema.type === 'string') {
+                                    subSchema.type = [subSchema.type];
+                                }
+                                subSchema.type.push('null');
+                            }
+
+                            const result = validateSchemaAndCollectSpecials(
+                                value[key],
+                                subSchema,
+                                currentPath.concat([key])
+                            );
+                            if (result.error) {
+                                return result;
+                            }
+                            if (result.specials) {
+                                collectedSpecials.push(...result.specials);
+                            }
+                            processedProperties.add(key);
+                        }
+                    }
+                    if (schema.additionalProperties !== undefined) {
+                        for (const [key, val] of Object.entries(value)) {
+                            if (!processedProperties.has(key)) {
+                                const result = validateSchemaAndCollectSpecials(
+                                    val,
+                                    schema.additionalProperties,
+                                    currentPath.concat([key])
+                                );
+                                if (result.error) {
+                                    return result;
+                                }
+                                if (result.specials) {
+                                    collectedSpecials.push(...result.specials);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (schema.type === 'array') {
+                if (!isArray(value)) {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not an array'
+                        }
+                    };
+                }
+
+                let itemsIndex = 0;
+                if (Array.isArray(schema.prefixItems)) {
+                    for (let i = 0; i < schema.prefixItems.length; i++) {
+                        const result = validateSchemaAndCollectSpecials(
+                            value[i],
+                            schema.prefixItems[i],
+                            currentPath.concat([i])
+                        );
+                        if (result.error) {
+                            return result;
+                        }
+                        if (result.specials) {
+                            collectedSpecials.push(...result.specials);
+                        }
+                    }
+                    itemsIndex = schema.prefixItems.length;
+                }
+
+                if (typeof schema.items !== 'undefined') {
+                    for (let i = itemsIndex; i < value.length; i++) {
+                        const result = validateSchemaAndCollectSpecials(
+                            value[i],
+                            schema.items,
+                            currentPath.concat([i])
+                        );
+                        if (result.error) {
+                            return result;
+                        }
+                        if (result.specials) {
+                            collectedSpecials.push(...result.specials);
+                        }
+                    }
+                }
+            } else if (schema.type === 'string') {
+                if (typeof value !== 'string' && !(value instanceof String)) {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not a string'
+                        }
+                    };
+                }
+            } else if (schema.type === 'number') {
+                if (typeof value !== 'number') {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not a number'
+                        }
+                    };
+                }
+            } else if (schema.type === 'integer') {
+                if (!Number.isInteger(value)) {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not an integer'
+                        }
+                    };
+                }
+            } else if (schema.type === 'boolean') {
+                if (typeof value !== 'boolean') {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not a boolean'
+                        }
+                    };
+                }
+            } else if (schema.type === 'null') {
+                if (value !== null && value !== undefined) {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'not a null'
+                        }
+                    };
+                }
+            } else {
+                return {
+                    error: {
+                        path: currentPath,
+                        message: `invalid schema: unknown type ${schema.type}`
+                    }
+                };
+            }
+
+            return {
+                specials: collectedSpecials
+            };
         }
 
         // `kind` is one of the following:
         // - 'any'
         // - 'all'
         // - 'one'
-        function validateSchemaList(kind, value, schemaList, currentPath, outSpecials, outPaths) {
+        function validateSchemaList(kind, value, schemaList, currentPath) {
             if (schemaList.length === 0) {
-                return true;
+                return { 
+                    specials: []
+                };
             }
 
             if (kind === 'any') {
+                let firstErr = null;
                 // at least one of the schemas should match
                 for (const subSchema of schemaList) {
-                    let tmpSpecials = [];
-                    let tmpPaths = [];
-                    if (validateSchemaAndCollectSpecials(value, subSchema, currentPath, tmpSpecials, tmpPaths)) {
-                        outSpecials.push(...tmpSpecials);
-                        outPaths.push(...tmpPaths);
-                        return true;
+                    const result = validateSchemaAndCollectSpecials(
+                        value, 
+                        subSchema, 
+                        currentPath
+                    );
+                    if (!result.error) {
+                        return result;
+                    } else if (firstErr === null) {
+                        firstErr = result;
                     }
                 }
-                return false;
+                return firstErr || {
+                    error: {
+                        value: value,
+                        path: currentPath,
+                        message: 'value does not match any schema'
+                    }
+                };
             }
 
-            let results = [];
+            let oks = [];
+            let firstErr = null;
             for (let i = 0; i < schemaList.length; i++) {
-                let tmpSpecials = [];
-                let tmpPaths = [];
-                if (validateSchemaAndCollectSpecials(value, schemaList[i], currentPath.concat([i]), tmpSpecials, tmpPaths)) {
-                    results.push({
-                        matches: true,
-                        specials: tmpSpecials,
-                        paths: tmpPaths,
-                    });
-                } else {
-                    results.push({
-                        matches: false,
-                    });
+                const result = validateSchemaAndCollectSpecials(
+                    value,
+                    schemaList[i],
+                    currentPath.concat([i])
+                );
+                if (!result.error) {
+                    oks.push(result);
+                } else if (firstErr === null) {
+                    firstErr = result;
                 }
             }
 
             if (kind === 'all') {
                 // all of the schemas should match
-                if (results.every(result => result.matches)) {
-                    outSpecials.push(...results.map(result => result.specials).flat());
-                    outPaths.push(...results.map(result => result.paths).flat());
-                    return true;
+                if (firstErr !== null) {
+                    return firstErr;
+                } else {
+                    let allSpecials = [];
+                    for (const ok of oks) {
+                        allSpecials.push(...ok.specials);
+                    }
+                    return {
+                        specials: allSpecials
+                    };
                 }
-                return false;
             } else {
                 // only one of the schemas should match
-                let index = null;
-                for (let i = 0; i < results.length; i++) {
-                    if (results[i].matches && index === null) {
-                        index = i;
-                    } else {
-                        return false;
+                if (oks.length === 1) {
+                    return oks[0];
+                } else if (oks.length > 1) {
+                    return {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'value matches more than one schema'
+                        }
+                    };
+                } else {
+                    return firstErr || {
+                        error: {
+                            value: value,
+                            path: currentPath,
+                            message: 'value matches no schema'
+                        }
+                    };
+                }
+            }
+        }
+
+        function sortAndUniqueSpecials(specials) {
+            if (specials.length === 0) {
+                return specials;
+            }
+
+            function compareSpecials(a, b) {
+                if (a.path.length !== b.path.length) {
+                    return a.path.length - b.path.length;
+                }
+                for (let i = 0; i < a.path.length; i++) {
+                    if (a.path[i] !== b.path[i]) {
+                        if (typeof a.path[i] === 'number' && typeof b.path[i] === 'number') {
+                            return a.path[i] - b.path[i];
+                        } else {
+                            return String(a.path[i]).localeCompare(String(b.path[i]));
+                        }
                     }
                 }
-                outSpecials.push(...results[index].specials);
-                outPaths.push(...results[index].paths);
-                return true;
+                return 0;
             }
+
+            specials.sort(compareSpecials);
+
+            const uniqueSpecials = [specials[0]];
+            for (let i = 1; i < specials.length; i++) {
+                const last = specials[i - 1];
+                const current = specials[i];
+                if (compareSpecials(current, last) !== 0) {
+                    uniqueSpecials.push(current);
+                }
+            }
+            return uniqueSpecials;
+        }
+
+        function pathString(path) {
+            return path.map(p => typeof p === 'number' ? `[${p}]` : `['${p}']`).join('');
         }
 
         return (function (value) {
             let schema = this;
-            let specials = [];
-            let paths = [];
+            let result = validateSchemaAndCollectSpecials(value, schema, []);
+            if (result.error) {
+                let { path, value, message } = result.error;
+                let pathStr = pathString(path);
+                throw new Error(
+                    `schema validation failed ${pathStr}: ${message}`,
+                    { cause: { value } }
+                );
+            }
 
-            let matches = validateSchemaAndCollectSpecials(
-                value,
-                schema,
-                [],
-                specials,
-                paths,
-            );
-            if (!matches) {
-                throw new Error(`schema validation failed`);
+            let paths = [];
+            let specials = [];
+
+            if (result.specials.length !== 0) {
+                result.specials = sortAndUniqueSpecials(result.specials);
+
+                paths = result.specials.map(s => s.path);
+                specials = result.specials.map(s => s.value);
+
+                // replace the container of the special value with a new container
+                // for replacing the special value with `{}`
+                const cloneValue = (value) => {
+                    if (isArray(value)) {
+                        return Array.from(value);
+                    } else if (typeof value === 'object' && value !== null) {
+                        return Object.create({}, value);
+                    }
+                    return value;
+                }
+
+                replacedPaths = new Set();
+                const replaceValue = (path) => {
+                    if (path.length === 0) {
+                        // root value is a special value
+                        value = {};
+                        replacedPaths.add(path);
+                    } else {
+                        let prefixPath = [];
+                        let parentValue = value;
+                        for (let i = 0; i < path.length - 1; i++) {
+                            let element = path[i];
+                            prefixPath.push(element);
+                            let prefixPathStr = pathString(prefixPath);
+                            if (!replacedPaths.has(prefixPathStr)) {
+                                replacedPaths.add(prefixPathStr);
+                                parentValue[element] = cloneValue(parentValue[element]);
+                            }
+                            parentValue = parentValue[element];
+                        }
+
+                        let lastElement = path[path.length - 1];
+                        let pathStr = pathString(path);
+                        if (!replacedPaths.has(pathStr)) {
+                            replacedPaths.add(pathStr);
+                            parentValue[lastElement] = {};
+                        }
+                    }
+                };
+
+                for (let i = 0; i < paths.length; i++) {
+                    replaceValue(paths[i]);
+                }
             }
 
             return {
                 descriptor: { value, paths },
-                specials, 
+                specials,
             };
         });
     })().bind($chromiumoxideEvaluatorContext$.resultSchema);
