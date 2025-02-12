@@ -29,8 +29,13 @@ pub async fn eval_global<R: NativeValueFromJs>(
         return Err(CdpError::JavascriptException(Box::new(exception)));
     }
     let remote_object = resp.result;
-    let json_value = if let Some(json_value) = remote_object.value {
-        json_value
+    if let Some(json) = remote_object.value {
+        Ok(
+            serde::de::DeserializeSeed::deserialize(
+                de::PageDeserializeSeed::new(page.clone(), std::marker::PhantomData),
+                json
+            )?
+        )
     } else if let Ok(special) = SpecialValue::from_remote_object(&page, remote_object).await {
         match special {
             SpecialValue::Remote(remote) => {
@@ -42,17 +47,18 @@ pub async fn eval_global<R: NativeValueFromJs>(
                 );
                 return evaluator.eval().await;
             }
-            special => {
-                special.into_json()?
+            SpecialValue::BigInt(big_int) => {
+                page.invoke_function("(x) => x", None)
+                    .argument(big_int)?
+                    .invoke().await
+            }
+            SpecialValue::Undefined(undefined) => {
+                page.invoke_function("(x) => x", None)
+                    .argument(undefined)?
+                    .invoke().await
             }
         }
     } else {
         return Err(CdpError::msg("No value found"));
-    };
-    Ok(
-        serde::de::DeserializeSeed::deserialize(
-            de::PageDeserializeSeed::new(page.clone(), std::marker::PhantomData),
-            json_value
-        )?
-    )
+    }
 }

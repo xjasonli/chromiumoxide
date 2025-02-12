@@ -7,14 +7,12 @@ use super::*;
 
 pub(crate) const JS_REMOTE_KEY: &str = "$chromiumoxide::js::remote";
 pub(crate) const JS_BIGINT_KEY: &str = "$chromiumoxide::js::bigint";
-pub(crate) const JS_EXPR_KEY  : &str = "$chromiumoxide::js::expr";
 pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
 
 #[derive(Debug, Clone)]
 pub(crate) enum SpecialValue {
     Remote(JsRemote),
     BigInt(JsBigInt),
-    Expr(JsExpr),
     Undefined(JsUndefined),
 }
 
@@ -101,7 +99,7 @@ impl SpecialValue {
         Err(CdpError::UnexpectedValue(format!("Unsupported remote object: {remote_object:?}")))
     }
 
-    pub fn into_call_argument(self, exprs: &mut Vec<String>) -> CallArgument {
+    pub fn into_call_argument(self) -> CallArgument {
         let argument = match self {
             SpecialValue::Remote(remote) => {
                 CallArgument::builder()
@@ -113,12 +111,6 @@ impl SpecialValue {
                 value.push('n');
                 CallArgument::builder()
                     .unserializable_value(value)
-                    .build()
-            }
-            SpecialValue::Expr(expr) => {
-                exprs.push(expr.0);
-                CallArgument::builder()
-                    .value(exprs.len() - 1)
                     .build()
             }
             SpecialValue::Undefined(_) => CallArgument::default(),
@@ -133,9 +125,6 @@ impl SpecialValue {
         if let Ok(big_int) = JsBigInt::deserialize(json) {
             return Some(SpecialValue::BigInt(big_int));
         }
-        if let Ok(expr) = JsExpr::deserialize(json) {
-            return Some(SpecialValue::Expr(expr));
-        }
         if let Ok(undefined) = JsUndefined::deserialize(json) {
             return Some(SpecialValue::Undefined(undefined));
         }
@@ -147,7 +136,6 @@ impl SpecialValue {
         let value = match self {
             SpecialValue::Remote(data) => data.serialize(serializer)?,
             SpecialValue::BigInt(big_int) => big_int.serialize(serializer)?,
-            SpecialValue::Expr(expr) => expr.serialize(serializer)?,
             SpecialValue::Undefined(undefined) => undefined.serialize(serializer)?,
         };
         Ok(value)
@@ -173,11 +161,11 @@ impl From<JsBigInt> for SpecialValue {
     }
 }
 
-impl From<JsExpr> for SpecialValue {
-    fn from(expr: JsExpr) -> Self {
-        SpecialValue::Expr(expr)
-    }
-}
+//impl From<JsExpr> for SpecialValue {
+//    fn from(expr: JsExpr) -> Self {
+//        SpecialValue::Expr(expr)
+//    }
+//}
 
 
 #[derive(Debug, Clone, Eq, PartialEq)]

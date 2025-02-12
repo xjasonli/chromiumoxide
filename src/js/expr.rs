@@ -1,5 +1,3 @@
-use crate::js::helper;
-
 #[macro_export]
 macro_rules! js_expr_str {
     ($($js:tt)+) => {
@@ -14,6 +12,8 @@ macro_rules! js_expr {
 }
 pub use js_expr;
 pub use js_expr_str;
+
+pub(crate) const JS_EXPR_KEY  : &str = "$chromiumoxide::js::expr";
 
 #[derive(Debug, Clone)]
 pub struct JsExpr(pub String);
@@ -57,7 +57,7 @@ impl serde::Serialize for JsExpr {
         use serde::ser::SerializeStruct;
 
         let mut s = serializer.serialize_struct("JsExpr", 1)?;
-        s.serialize_field(helper::JS_EXPR_KEY , &self.0)?;
+        s.serialize_field(JS_EXPR_KEY , &self.0)?;
         s.end()
     }
 }
@@ -72,13 +72,13 @@ impl<'de> serde::Deserialize<'de> for JsExpr {
                     type Value = Key;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        formatter.write_str(helper::JS_EXPR_KEY)
+                        formatter.write_str(JS_EXPR_KEY)
                     }
                     fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                        if value == helper::JS_EXPR_KEY {
+                        if value == JS_EXPR_KEY {
                             Ok(Key)
                         } else {
-                            Err(E::unknown_field(value, &[helper::JS_EXPR_KEY]))
+                            Err(E::unknown_field(value, &[JS_EXPR_KEY]))
                         }
                     }
                 }
@@ -99,13 +99,13 @@ impl<'de> serde::Deserialize<'de> for JsExpr {
                     return Ok(val);
                 }
                 use serde::de::Error as _;
-                Err(A::Error::missing_field(helper::JS_EXPR_KEY))
+                Err(A::Error::missing_field(JS_EXPR_KEY))
             }
         }
 
         let value = deserializer.deserialize_struct(
-            helper::JS_EXPR_KEY,
-            &[helper::JS_EXPR_KEY],
+            JS_EXPR_KEY,
+            &[JS_EXPR_KEY],
             Visitor
         )?;
         Ok(JsExpr(value))

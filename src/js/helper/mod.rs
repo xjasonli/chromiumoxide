@@ -15,12 +15,12 @@ pub(crate) use patterns::*;
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 
-type JsonPointer = Vec<JsonPointerSegment>;
-type JsonPointerRef<'a> = &'a [JsonPointerSegment];
+pub(crate) type JsonPointer = Vec<JsonPointerSegment>;
+pub(crate) type JsonPointerRef<'a> = &'a [JsonPointerSegment];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum JsonPointerSegment {
+pub(crate) enum JsonPointerSegment {
     Field(String),
     Index(usize),
 }
@@ -55,8 +55,17 @@ pub(crate) struct ValueDescriptor {
 }
 
 impl ValueDescriptor {
-    pub fn parse(mut json: JsonValue) -> (Self, Vec<SpecialValue>) {
-        let (paths, specials) = utils::split_from_json(&mut json);
+    #[allow(dead_code)]
+    pub fn parse(json: JsonValue) -> (Self, Vec<SpecialValue>) {
+        Self::parse_with_expr(json, &[], &mut vec![])
+    }
+
+    pub fn parse_with_expr(
+        mut json: JsonValue,
+        expr_prefix: JsonPointerRef<'_>,
+        expr_list: &mut Vec<(JsonPointer, String)>
+    ) -> (Self, Vec<SpecialValue>) {
+        let (paths, specials) = utils::split_from_json(&mut json, expr_prefix, expr_list);
         (
             Self {
                 value: json,
@@ -75,16 +84,27 @@ impl ValueDescriptor {
 mod utils {
     use super::*;
 
-    pub(super) fn split_from_json(json: &mut JsonValue) -> (Vec<JsonPointer>, Vec<SpecialValue>) {
+    pub(super) fn split_from_json(
+        json: &mut JsonValue,
+        expr_prefix: JsonPointerRef<'_>,
+        expr_list: &mut Vec<(JsonPointer, String)>
+    ) -> (Vec<JsonPointer>, Vec<SpecialValue>) {
         fn split_impl(
             json: &mut JsonValue,
             current: JsonPointer,
             paths: &mut Vec<JsonPointer>,
-            specials: &mut Vec<SpecialValue>
+            specials: &mut Vec<SpecialValue>,
+            expr_prefix: JsonPointerRef<'_>,
+            expr_list: &mut Vec<(JsonPointer, String)>,
         ) {
             match json {
                 JsonValue::Object(obj) => {
-                    if let Some(special) = SpecialValue::from_json(obj) {
+                    if let Some(expr) = JsExpr::deserialize(&*obj).ok() {
+                        let mut path= expr_prefix.to_owned();
+                        path.extend(current);
+
+                        expr_list.push((path, expr.into()));
+                    } else if let Some(special) = SpecialValue::from_json(obj) {
                         paths.push(current);
                         specials.push(special);
                         *obj = JsonObject::new();
@@ -92,7 +112,7 @@ mod utils {
                         for (key, val) in obj.iter_mut() {
                             let mut new_path = current.clone();
                             new_path.push(JsonPointerSegment::Field(key.clone()));
-                            split_impl(val, new_path, paths, specials);
+                            split_impl(val, new_path, paths, specials, expr_prefix, expr_list);
                         }
                     }
                 }
@@ -100,7 +120,7 @@ mod utils {
                     for (idx, val) in arr.iter_mut().enumerate() {
                         let mut new_path = current.clone();
                         new_path.push(JsonPointerSegment::Index(idx));
-                        split_impl(val, new_path, paths, specials);
+                        split_impl(val, new_path, paths, specials, expr_prefix, expr_list);
                     }
                 }
                 _ => (),
@@ -109,7 +129,7 @@ mod utils {
 
         let mut paths = Vec::new();
         let mut specials = Vec::new();
-        split_impl(json, vec![], &mut paths, &mut specials);
+        split_impl(json, vec![], &mut paths, &mut specials, expr_prefix, expr_list);
         (paths, specials)
     }
 

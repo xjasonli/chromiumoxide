@@ -207,18 +207,23 @@ impl InvokeParams {
     }
 
     /// Converts the parameters into CDP call arguments.
-    pub fn into_arguments(self, expr_list: &mut Vec<String>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
+    pub fn into_arguments(self, expr_list: &mut Vec<(helper::JsonPointer, String)>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
         let mut args = vec![];
 
         let mut descriptors = vec![];
         let mut specials = vec![];
-        for arg in self.arguments {
-            let (descriptor, special) = helper::ValueDescriptor::parse(arg);
+        for (i, arg) in self.arguments.into_iter().enumerate() {
+            let prefix = [helper::JsonPointerSegment::Index(i)];
+            let (descriptor, special) = helper::ValueDescriptor::parse_with_expr(
+                arg,
+                &prefix,
+                expr_list
+            );
             descriptors.push(descriptor);
             specials.extend(special);
         }
         for special in specials {
-            args.push(special.into_call_argument(expr_list));
+            args.push(special.into_call_argument());
         }
         args.push(CallArgument{
             value: Some(serde_json::to_value(descriptors)?),

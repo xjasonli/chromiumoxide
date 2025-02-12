@@ -103,9 +103,16 @@ impl Expr {
 }
 
 const EVALUATOR: &'static str = include_str!("evaluator.js");
-fn generate_function(expr_func: &str, expr_list: &[String]) -> String {
+fn generate_function(expr_func: &str, expr_list: &[(JsonPointer, String)]) -> String {
     let expr_list = expr_list.into_iter()
-        .map(|expr| format!("(()=>({}))()", expr))
+        .map(|(path, expr)| {
+            let path_json = serde_json::to_string(path).unwrap();
+            format!(
+                "{{ path: {}, value: (()=>({}))() }}",
+                path_json,
+                expr
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
     EVALUATOR.replace(
@@ -194,7 +201,7 @@ impl EvalTarget {
 
 struct RawParams {
     expr_func: Cow<'static, str>,
-    expr_list: Vec<String>,
+    expr_list: Vec<(JsonPointer, String)>,
     expr_this: CallArgument,
     func_args: Vec<CallArgument>,
     context: Option<ExecutionContext>,

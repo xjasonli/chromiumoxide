@@ -1,23 +1,48 @@
  (...$chromiumoxideEvaluatorArguments$) => {
-    const $chromiumoxideEvaluatorContext$ = {
-        resultSchema: $chromiumoxideEvaluatorArguments$.pop(),
-        awaitPromise: $chromiumoxideEvaluatorArguments$.pop(),
-        exprThis: $chromiumoxideEvaluatorArguments$.pop(),
-        funcThis: $chromiumoxideEvaluatorArguments$.pop(),
-        descriptors: $chromiumoxideEvaluatorArguments$.pop(),
-        specials: $chromiumoxideEvaluatorArguments$,
-    };
+    $chromiumoxideEvaluatorArguments$ = ((v) => ({
+        resultSchema: v.pop(),
+        awaitPromise: v.pop(),
+        exprThis: v.pop(),
+        funcThis: v.pop(),
+        descriptors: v.pop(),
+        specials: v,
+    }))($chromiumoxideEvaluatorArguments$);
 
-    $chromiumoxideEvaluatorContext$.func = (
+    $chromiumoxideEvaluatorArguments$.func = (
         function(){return (__EXPR_FUNC__);}
-    ).call($chromiumoxideEvaluatorContext$.exprThis);
+    ).call($chromiumoxideEvaluatorArguments$.exprThis);
 
-    $chromiumoxideEvaluatorContext$.exprs = (
+    $chromiumoxideEvaluatorArguments$.exprList = (
         function(){return [__EXPR_LIST__];}
-    ).call($chromiumoxideEvaluatorContext$.exprThis);
+    ).call($chromiumoxideEvaluatorArguments$.exprThis);
+
+    let {
+        resultSchema,
+        awaitPromise,
+        funcThis,
+        descriptors,
+        specials,
+        exprList,
+        func,
+    } = $chromiumoxideEvaluatorArguments$;
+
+    // cross-realm compatible way to check if `value` is an array
+    const isArray = (value) => {
+        return typeof value === 'object' && value !== null &&
+                typeof value.length === 'number' &&
+                typeof value.splice === 'function' &&
+                typeof value.slice === 'function' &&
+                value.constructor.name === 'Array';
+    }
+
+    // cross-realm compatible way to check if `value` is an object
+    // excludes arrays
+    const isObject = (value) => {
+        return typeof value === 'object' && value !== null && !isArray(value);
+    }
 
     const mergeSpecials = (() => {
-        function mergeSpecials(descriptors, specials, expressions) {
+        function mergeSpecials(descriptors, specials, exprList) {
             let offset = 0;
             for (let i = 0; i < descriptors.length; i++) {
                 let descriptor = descriptors[i];
@@ -26,36 +51,34 @@
                         descriptor.value,
                         descriptor.paths[j],
                         specials[offset + j],
-                        expressions
                     );
-                    offset += 1;
                 }
+                offset += descriptor.paths.length;
             }
-            return descriptors.map(descriptor => descriptor.value);
+
+            let values = descriptors.map(descriptor => descriptor.value);
+            for (let i = 0; i < exprList.length; i++) {
+                values = mergeSpecial(
+                    values,
+                    exprList[i].path,
+                    exprList[i].value
+                );
+            }
+            return values;
         };
 
-        function mergeSpecial(value, path, special, expressions) {
+        function mergeSpecial(value, path, special) {
             if (path.length === 0) {
-                if (
-                    typeof special === 'object' ||
-                    typeof special === 'function' ||
-                    typeof special === 'symbol' ||
-                    typeof special === 'bigint'
-                ) {
-                    return special;
-                } else if (typeof special === 'number') {
-                    return expressions[special];
-                }
-                throw new Error('Unsupported special value: ' + special);
+                return special;
             }
 
             const segment = path[0];
-            if (typeof segment === 'string' && typeof value !== 'object') {
+            if (typeof segment === 'string' && !isObject(value)) {
                 value = {};
             } else if (typeof segment === 'number' && !isArray(value)) {
                 value = [];
             }
-            value[segment] = mergeSpecial(value[segment], path.slice(1), special, expressions);
+            value[segment] = mergeSpecial(value[segment], path.slice(1), special);
             return value;
         };
 
@@ -114,15 +137,6 @@
                 return 'undefined';
             }
             return null;
-        }
-
-        // cross-realm compatible way to check if `value` is an array
-        const isArray = (value) => {
-            return typeof value === 'object' && value !== null &&
-                   typeof value.length === 'number' &&
-                   typeof value.splice === 'function' &&
-                   typeof value.slice === 'function' &&
-                   value.constructor.name === 'Array';
         }
 
         // validate the `value` using `schema` and collect all `RemoteObject`
@@ -663,22 +677,12 @@
                 specials,
             };
         });
-    })().bind($chromiumoxideEvaluatorContext$.resultSchema);
+    })().bind(resultSchema);
 
-    const funcArgs = mergeSpecials(
-        $chromiumoxideEvaluatorContext$.descriptors,
-        $chromiumoxideEvaluatorContext$.specials,
-        $chromiumoxideEvaluatorContext$.exprs
-    );
-
-    const result = $chromiumoxideEvaluatorContext$.func.call(
-        $chromiumoxideEvaluatorContext$.funcThis,
-        ...funcArgs
-    );
-
-    if ($chromiumoxideEvaluatorContext$.awaitPromise) {
-        return Promise.resolve(result)
-            .then(splitSpecials);
+    const funcArgs = mergeSpecials(descriptors, specials, exprList);
+    const result = func.call(funcThis, ...funcArgs);
+    if (awaitPromise) {
+        return Promise.resolve(result).then(splitSpecials);
     } else {
         return splitSpecials(result);
     }

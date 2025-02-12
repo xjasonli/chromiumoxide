@@ -61,6 +61,7 @@ impl<'de> serde::Deserialize<'de> for JsUndefined {
                 Err(A::Error::missing_field(helper::JS_UNDEFINED_KEY))
             }
         }
+
         deserializer.deserialize_struct(
             "JsUndefined",
             &[helper::JS_UNDEFINED_KEY],
