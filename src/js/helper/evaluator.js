@@ -602,12 +602,14 @@
                 // replace the container of the special value with a new container
                 // for replacing the special value with `{}`
                 const cloneValue = (value) => {
-                    if (isArray(value)) {
-                        return Array.from(value);
-                    } else if (typeof value === 'object' && value !== null) {
-                        return Object.create({}, value);
+                    if (typeof value === 'object' && value !== null) {
+                        if (isArray(value)) {
+                            return Array.from(value);
+                        } else {
+                            return Object.assign({}, value);
+                        }
                     }
-                    return value;
+                    throw new Error('encountered non-object container type for special value', { cause: value });
                 }
 
                 replacedPaths = new Set();
