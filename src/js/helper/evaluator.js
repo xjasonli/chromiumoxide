@@ -560,6 +560,17 @@
                 }
                 return 0;
             }
+            function isParentPath(parent, child) {
+                if (parent.length >= child.length) {
+                    return false;
+                }
+                for (let i = 0; i < parent.length; i++) {
+                    if (parent[i] !== child[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
 
             specials.sort(compareSpecials);
 
@@ -568,6 +579,9 @@
                 const last = specials[i - 1];
                 const current = specials[i];
                 if (compareSpecials(current, last) !== 0) {
+                    if (isParentPath(last.path, current.path)) {
+                        continue;
+                    }
                     uniqueSpecials.push(current);
                 }
             }
@@ -610,40 +624,38 @@
                         }
                     }
                     throw new Error('encountered non-object container type for special value', { cause: value });
-                }
+                };
 
-                replacedPaths = new Set();
-                const replaceValue = (path) => {
-                    if (path.length === 0) {
-                        // root value is a special value
-                        value = {};
-                        replacedPaths.add(path);
-                    } else {
+                const replaceSpecialValues = () => {
+                    const replacedPaths = new Set();
+                    if (paths[0].length === 0) {
+                        // the root value is a special value
+                        return {};
+                    }
+                    const replacedValue = cloneValue(value);
+                    const replaceByPath = (path) => {
                         let prefixPath = [];
-                        let parentValue = value;
+                        let parentValue = replacedValue;
                         for (let i = 0; i < path.length - 1; i++) {
-                            let element = path[i];
-                            prefixPath.push(element);
+                            let pathSegment = path[i];
+                            prefixPath.push(pathSegment);
                             let prefixPathStr = pathString(prefixPath);
                             if (!replacedPaths.has(prefixPathStr)) {
                                 replacedPaths.add(prefixPathStr);
-                                parentValue[element] = cloneValue(parentValue[element]);
+                                parentValue[pathSegment] = cloneValue(parentValue[pathSegment]);
                             }
-                            parentValue = parentValue[element];
+                            parentValue = parentValue[pathSegment];
                         }
-
-                        let lastElement = path[path.length - 1];
-                        let pathStr = pathString(path);
-                        if (!replacedPaths.has(pathStr)) {
-                            replacedPaths.add(pathStr);
-                            parentValue[lastElement] = {};
-                        }
+                        let lastPathSegment = path[path.length - 1];
+                        parentValue[lastPathSegment] = {};
                     }
+                    for (let i = 0; i < paths.length; i++) {
+                        replaceByPath(paths[i]);
+                    }
+                    return replacedValue;
                 };
 
-                for (let i = 0; i < paths.length; i++) {
-                    replaceValue(paths[i]);
-                }
+                value = replaceSpecialValues(value);
             }
 
             return {
