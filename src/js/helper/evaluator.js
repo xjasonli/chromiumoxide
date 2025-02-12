@@ -75,13 +75,18 @@
             const JS_UNDEFINED_KEY = '$chromiumoxide::js::undefined';
 
             if (schema.properties && schema.properties.hasOwnProperty(JS_REMOTE_KEY)) {
-                return schema.properties[JS_REMOTE_KEY].type;
+                let default_allowlist = ["object", "function", "symbol"];
+                let allowlist = schema.properties[JS_REMOTE_KEY].properties.type.enum;
+                if (!allowlist) {
+                    allowlist = default_allowlist;
+                }
+                return allowlist;
             }
             if (schema.properties && schema.properties.hasOwnProperty(JS_BIGINT_KEY)) {
-                return 'bigint';
+                return ['bigint'];
             }
             if (schema.properties && schema.properties.hasOwnProperty(JS_UNDEFINED_KEY)) {
-                return 'undefined';
+                return ['undefined'];
             }
             return null;
         }
@@ -266,11 +271,11 @@
         function validateSimpleSchema(value, schema, currentPath) {
             let collectedSpecials = [];
             if (schema.type === 'object') {
-                const schemaSpecialType = getSchemaSpecialType(schema);
-                if (schemaSpecialType !== null) {
+                const allowedSpecialTypes = getSchemaSpecialType(schema);
+                if (allowedSpecialTypes !== null) {
                     // validate for remote object
                     const objectSpecialType = getObjectSpecialType(value);
-                    if (schemaSpecialType === objectSpecialType) {
+                    if (allowedSpecialTypes.includes(objectSpecialType)) {
                         collectedSpecials.push({
                             path: currentPath,
                             value: value
@@ -280,7 +285,7 @@
                             error: {
                                 value: value,
                                 path: currentPath,
-                                message: `not a special type: ${schemaSpecialType}`
+                                message: `not an allowed special type: ${objectSpecialType} (allowed: ${allowedSpecialTypes.join(', ')})`
                             }
                         };
                     }
