@@ -15,32 +15,38 @@ js_remote_object!(
             item(index: usize) -> Option<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/contains
-            contains(token: &str) -> bool;
+            contains(token: impl IntoJs<str>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/add
-            add<'a, I>(...tokens: I) -> ()
+            add<'a, I, T>(...tokens: I) -> ()
             where
-                I: IntoIterator<Item = &'a str>;
+                I: IntoIterator<Item = T>,
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/remove
-            remove<'a, I>(...tokens: I) -> ()
+            remove<'a, I, T>(...tokens: I) -> ()
             where
-                I: IntoIterator<Item = &'a str>;
+                I: IntoIterator<Item = T>,
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/replace
-            replace(old_token: &str, new_token: &str) -> bool;
+            replace(old_token: impl IntoJs<str>, new_token: impl IntoJs<str>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/supports
-            supports(token: &str) -> bool;
+            supports(token: impl IntoJs<str>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/toggle
-            toggle(token: &str, force?: bool) -> bool;
+            toggle(token: impl IntoJs<str>, force?: bool) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/entries
             entries() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/forEach
-            forEach(callback_fn: &Function, this?: &JsObject) -> ();
+            forEach(callback_fn: impl IntoJs<JsFunction>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/forEach
+            #[rename = + withThis]
+            forEach(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/keys
             keys() -> JsIterator;

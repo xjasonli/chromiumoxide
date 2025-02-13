@@ -55,12 +55,12 @@ macro_rules! js_remote_object {
             pub struct [< Js $t >]([< Js $parent >]);
 
             impl [< Js $t >] {
-                pub fn is_instance_of<T: Subclass<[< Js $t >]>>(&self) -> bool {
+                pub fn is_instance_of<T: DerivedJs<[< Js $t >]>>(&self) -> bool {
                     T::is_instance(self)
                 }
 
-                pub fn downcast<T: Subclass<[< Js $t >]>>(&self) -> Option<<T as Class<[< Js $t >]>>::Owned> {
-                    T::try_from_super(self.clone())
+                pub fn downcast<T: DerivedJs<[< Js $t >]>>(&self) -> Option<T::FromJs> {
+                    T::downcast_from(self.clone())
                 }
             }
 
@@ -72,30 +72,46 @@ macro_rules! js_remote_object {
                 }
             }
 
-            // implement Class<Self> for Self
+            // implement AsJs<Self> for Self
             impl private::Sealed for [< Js $t >] {}
-            impl Class<[< Js $t >]> for [< Js $t >] {
-                type Owned = Self;
-                fn as_ref(&self) -> &[< Js $t >] {
+            impl IntoJs<[< Js $t >]> for [< Js $t >] {
+                type FromJs = Self;
+            }
+            impl AsJs<[< Js $t >]> for [< Js $t >] {
+                fn as_js(&self) -> &[< Js $t >] {
                     self
                 }
             }
 
-            // implement Class<Parent> for Self
-            impl Class<[< Js $parent >]> for [< Js $t >] {
-                type Owned = Self;
-                fn as_ref(&self) -> &[< Js $parent >] {
+            // implement AsJs<Parent> for Self
+            impl IntoJs<[< Js $parent >]> for [< Js $t >] {
+                type FromJs = Self;
+            }
+
+            impl AsJs<[< Js $parent >]> for [< Js $t >] {
+                fn as_js(&self) -> &[< Js $parent >] {
                     &self.0
                 }
             }
+
+            // implement From<Self> for Parent
             impl From<[< Js $t >]> for [< Js $parent >] {
                 fn from(value: [< Js $t >]) -> Self {
                     value.0
                 }
             }
 
-            // implement Subclass<Parent> for Self
-            impl Subclass<[< Js $parent >]> for [< Js $t >] {
+            // implement TryFrom<Parent> for Self
+            impl TryFrom<[< Js $parent >]> for [< Js $t >] {
+                type Error = [< Js $parent >];
+                fn try_from(value: [< Js $parent >]) -> Result<Self, Self::Error> {
+                    value.downcast::<[< Js $t >]>()
+                        .ok_or(value)
+                }
+            }
+
+            // implement DerivedJs<Parent> for Self
+            impl DerivedJs<[< Js $parent >]> for [< Js $t >] {
                 fn is_instance(value: &[< Js $parent >]) -> bool {
                     $(
                         if value.remote_type().name() != $type {
@@ -119,47 +135,46 @@ macro_rules! js_remote_object {
                     true
                 }
 
-                fn from_super(value: [< Js $parent >]) -> <Self as Class<[< Js $parent >]>>::Owned {
+                fn downcast_from_unchecked(value: [< Js $parent >]) -> Self::FromJs {
                     Self(value)
                 }
             }
 
-            impl TryFrom<[< Js $parent >]> for [< Js $t >] {
-                type Error = [< Js $parent >];
-                fn try_from(value: [< Js $parent >]) -> Result<Self, Self::Error> {
-                    Self::try_from_super(value.clone())
-                        .ok_or(value)
-                }
-            }
-
             $($(
-                // implement Class<Ancestor> for Self
-                impl Class<[< Js $ancestor >]> for [< Js $t >] {
-                    type Owned = Self;
-                    fn as_ref(&self) -> &[< Js $ancestor >] {
+                // implement AsJs<Ancestor> for Self
+                impl IntoJs<[< Js $ancestor >]> for [< Js $t >] {
+                    type FromJs = Self;
+                }
+                impl AsJs<[< Js $ancestor >]> for [< Js $t >] {
+                    fn as_js(&self) -> &[< Js $ancestor >] {
                         &self.0
                     }
                 }
+                
+                // implement From<Self> for Ancestor
                 impl From<[< Js $t >]> for [< Js $ancestor >] {
                     fn from(value: [< Js $t >]) -> Self {
                         [< Js $parent >]::from(value).into()
                     }
                 }
 
-                // implement Subclass<Ancestor> for Self
-                impl Subclass<[< Js $ancestor >]> for [< Js $t >] {
-                    fn is_instance(value: &[< Js $ancestor >]) -> bool {
-                        [< Js $parent >]::is_instance(value)
-                    }
-                    fn from_super(value: [< Js $ancestor >]) -> <Self as Class<[< Js $ancestor >]>>::Owned {
-                        Self([< Js $parent >]::from_super(value))
-                    }
-                }
+                // implement TryFrom<Ancestor> for Self
                 impl TryFrom<[< Js $ancestor >]> for [< Js $t >] {
                     type Error = [< Js $ancestor >];
                     fn try_from(value: [< Js $ancestor >]) -> Result<Self, Self::Error> {
-                        Self::try_from_super(value.clone())
+                        value.downcast::<[< Js $t >]>()
                             .ok_or(value)
+                    }
+                }
+
+                // implement DerivedJs<Ancestor> for Self
+                impl DerivedJs<[< Js $ancestor >]> for [< Js $t >] {
+                    fn is_instance(value: &[< Js $ancestor >]) -> bool {
+                        [< Js $parent >]::is_instance(value)
+                    }
+
+                    fn downcast_from_unchecked(value: [< Js $ancestor >]) -> Self::FromJs {
+                        Self([< Js $parent >]::downcast_from_unchecked(value))
                     }
                 }
             )+)?
@@ -369,12 +384,12 @@ macro_rules! js_remote_object_properties {
     ) => {
         $(#[doc = $doc])*
         pub async fn $rename(&self) -> Result<$ty> {
-            const JS: &str = concat!(
+            const JS: JsExpr<'static> = JsExpr::const_new(concat!(
                 "() => {",
                     stringify!($($js)+),
                 "}",
-            );
-            self.invoke_function(JS, EvalOptions::default())
+            ));
+            self.invoke_function(JS)
                 .invoke().await
         }
     };
@@ -498,7 +513,7 @@ macro_rules! js_remote_object_methods {
                 $( $lt2: $clt2 ),+
             )?
             {
-                let invoker = self.invoke_method(stringify!($name), EvalOptions::default());
+                let invoker = self.invoke_method(stringify!($name));
                 $( js_remote_object_methods!(@argument invoker $(... $($spread_marker)?)? [< $arg:snake >]); )*
                 invoker.invoke().await
             }
@@ -539,13 +554,17 @@ macro_rules! js_remote_object_methods {
                 $( $lt2: $clt2 ),+
             )?
             {
-                const FUNCTION: &str = concat!(
+                const FUNCTION: JsExpr<'static> = JsExpr::const_new(concat!(
                     "(", $(stringify!($arg),)* ") => {",
                         stringify!($($js)*),
                     "}",
-                );
-                let invoker = self.invoke_function(FUNCTION, EvalOptions::default());
-                $( js_remote_object_methods!(@argument invoker $(... $($spread_marker)?)? [< $arg:snake >]); )*
+                ));
+                let invoker = self.invoke_function(FUNCTION);
+                $(
+                    js_remote_object_methods!{@argument
+                        invoker $(... $($spread_marker)?)? [< $arg:snake >]
+                    }
+                )*
                 invoker.invoke().await
             }
         }

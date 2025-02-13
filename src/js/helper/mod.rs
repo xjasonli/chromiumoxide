@@ -103,7 +103,7 @@ mod utils {
                         let mut path= expr_prefix.to_owned();
                         path.extend(current);
 
-                        expr_list.push((path, expr.into()));
+                        expr_list.push((path, expr.into_inner().into()));
                     } else if let Some(special) = SpecialValue::from_json(obj) {
                         paths.push(current);
                         specials.push(special);

@@ -39,7 +39,7 @@ use crate::utils::evaluation_string;
 use crate::handler::PageInner;
 use crate::page::Page;
 use crate::js::de::PageDeserializeSeed;
-use crate::js::{NativeValueFromJs, NativeValueIntoJs, FunctionNativeArgsFromJs, EvalParams, js_expr_str};
+use crate::js::{FromJs, IntoJs, FromJsArgs, ScopedEvalParams, js_expr_str};
 
 /// Trait for functions that can be exposed to JavaScript.
 ///
@@ -146,8 +146,8 @@ impl<'f> ExposedFunction<'f> {
         T: ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: ExposableFnError + 'f,
-        R: NativeValueIntoJs + 'f,
-        for<'a> A: FunctionNativeArgsFromJs + 'a,
+        R: IntoJs + 'f,
+        for<'a> A: FromJsArgs + 'a,
     {
         let inner = ExposedFunctionInner::new(name, page, callback).await?;
         Ok(Self(Arc::new(inner)))
@@ -176,8 +176,8 @@ impl<'f> ExposedFunctionInner<'f> {
         F: ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: ExposableFnError + 'f,
-        R: NativeValueIntoJs + 'f,
-        for<'a> A: FunctionNativeArgsFromJs + 'a,
+        R: IntoJs + 'f,
+        for<'a> A: FromJsArgs + 'a,
     {
         // Ensure the CDP binding is available
         ensure_binding(&page, &*CDP_BINDING_NAME).await?;
@@ -355,10 +355,10 @@ async fn get_arguments(
     execution_context_id: ExecutionContextId,
     schema: Schema,
 ) -> Result<Vec<JsonValue>> {
-    let params = EvalParams::new(GET_ARGUMENTS)
-        .context(execution_context_id);
+    let params = ScopedEvalParams::new(GET_ARGUMENTS)
+        .expr_execution_context(execution_context_id);
 
-    let JsonValue::Array(args) = page.invoke_function(params, None)
+    let JsonValue::Array(args) = page.invoke_function(params)
         .arguments((name, seq))?
         .invoke_with_schema(schema).await? else {
         return Err(CdpError::UnexpectedValue("args is not an array".to_string()));
@@ -376,10 +376,10 @@ async fn set_result(
     result: Option<JsonValue>,
     errmsg: Option<String>
 ) -> Result<()> {
-    let params = EvalParams::new(SET_RESULT)
-        .context(execution_context_id);
+    let params = ScopedEvalParams::new(SET_RESULT)
+        .expr_execution_context(execution_context_id);
 
-    page.invoke_function(params, None)
+    page.invoke_function(params)
         .arguments((name, seq, result, errmsg))?
         .invoke::<()>().await?;
     Ok(())
@@ -408,7 +408,7 @@ struct BoxedFn<'f, M, E, R, A>(
 #[async_trait::async_trait]
 impl<'f, M, E, R, A> ErasedFn for BoxedFn<'f, M, E, R, A>
 where
-    A: FunctionNativeArgsFromJs,
+    A: FromJsArgs,
 {
     async fn invoke_from_javascript(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, String> {
         self.0.invoke_from_javascript(page.into(), args).await
@@ -433,8 +433,8 @@ macro_rules! impl_exposable_fn {
             where
                 F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync + 'f,
                 E: ExposableFnError + 'f,
-                R: NativeValueIntoJs + 'f,
-                $( for<'a> $ty: NativeValueFromJs + 'a,)*
+                R: IntoJs + 'f,
+                $( for<'a> $ty: FromJs + 'a,)*
             {
                 async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
                     let page: Arc<PageInner> = page.into();
@@ -486,8 +486,8 @@ macro_rules! impl_exposable_fn_async {
                 F: (Fn($($ty,)*) -> Fut) + Send + Sync + 'f,
                 Fut: futures::Future<Output = Result<R, E>> + Send + 'f,
                 E: ExposableFnError + 'f,
-                R: NativeValueIntoJs + 'f,
-                $( for<'a> $ty: NativeValueFromJs + 'a,)*
+                R: IntoJs + 'f,
+                $( for<'a> $ty: FromJs + 'a,)*
             {
                 async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
                     let page: Arc<PageInner> = page.into();
@@ -561,7 +561,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
             return null;
         }
     );
-    let descriptor: Option<PropertyDescriptor> = page.invoke_function(GET_BINDING_DESC, None)
+    let descriptor: Option<PropertyDescriptor> = page.invoke_function(GET_BINDING_DESC)
         .argument(binding_name)?
         .invoke().await?;
 
@@ -592,7 +592,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
             }
         );
         // Make the cdp binding non-enumerable on the main frame
-        page.invoke_function(SET_BINDING_ENUMERABLE, None)
+        page.invoke_function(SET_BINDING_ENUMERABLE)
             .argument(binding_name)?
             .invoke::<()>().await?;
     }

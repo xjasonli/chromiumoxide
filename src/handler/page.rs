@@ -406,48 +406,45 @@ impl PageInner {
         Ok(utils::base64::decode(&res.data)?)
     }
 
-    pub async fn eval_global<R: js::NativeValueFromJs>(
+    pub async fn eval_global<'a, R: js::FromJs>(
         self: &Arc<Self>,
-        params: impl Into<js::EvalGlobalParams>,
+        params: impl Into<js::GlobalEvalParams<'a>>,
     ) -> Result<R> {
         let params = params.into();
         js::helper::eval_global(
             self.clone(),
             params.expr,
-            params.context,
+            params.execution_context,
             params.options
         ).await
     }
 
-    pub async fn eval<T: js::NativeValueFromJs>(
+    pub async fn eval<'a, T: js::FromJs>(
         self: &Arc<Self>,
-        params: impl Into<js::EvalParams>,
+        params: impl Into<js::ScopedEvalParams<'a>>,
     ) -> Result<T> {
         let params = params.into();
         let evaluator = js::helper::Evaluator::new_expr(
             self.clone(),
             params.expr,
-            params.this,
-            params.context,
+            params.expr_context,
             params.options
         );
         evaluator.eval().await
     }
 
-    pub fn invoke_function(
+    pub fn invoke_function<'a>(
         self: &Arc<Self>,
-        params: impl Into<js::EvalParams>,
-        this: Option<&js::JsRemoteObject>,
-    ) -> js::FunctionInvoker {
+        params: impl Into<js::ScopedEvalParams<'a>>,
+    ) -> js::FunctionInvoker<'a> {
         let params = params.into();
         let evaluator = js::helper::Evaluator::new_expr(
             self.clone(),
             params.expr,
-            params.this,
-            params.context,
+            params.expr_context,
             params.options
         );
-        evaluator.invoke(this)
+        evaluator.invoke()
     }
 
     pub async fn expose_function<'f, F, M, E, R, A>(
@@ -459,8 +456,8 @@ impl PageInner {
         F: js::ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: js::ExposableFnError + 'f,
-        R: js::NativeValueIntoJs + 'f,
-        for<'a> A: js::FunctionNativeArgsFromJs + 'a,
+        R: js::IntoJs + 'f,
+        for<'a> A: js::FromJsArgs + 'a,
     {
         js::ExposedFunction::new(
             name.into(),

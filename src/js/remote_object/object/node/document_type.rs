@@ -21,27 +21,27 @@ js_remote_object!(
             after<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/after
             #[rename = +text]
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/before
             before<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/before
             #[rename = +text]
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/remove
             remove() -> ();
@@ -50,14 +50,14 @@ js_remote_object!(
             replaceWith<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/replaceWith
             #[rename = +text]
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
         }
     }
 );

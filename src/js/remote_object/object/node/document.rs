@@ -161,20 +161,20 @@ js_remote_object!(
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/adoptNode
-            adoptNode<T: Class<JsNode>>(node: T) -> T::Owned;
+            adoptNode<T: IntoJs<JsNode>>(node: T) -> T::FromJs;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/append
             append<'a, I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/append
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/caretPositionFromPoint
             caretPositionFromPoint(x: f64, y: f64) -> Option<JsObject>;
@@ -206,10 +206,13 @@ js_remote_object!(
             createElementNS(namespace_uri: &str, qualified_name: &str) -> JsElement;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createNodeIterator
-            createNodeIterator<T: Class<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
+            createNodeIterator<T: IntoJs<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createProcessingInstruction
-            createProcessingInstruction(target: &str, data: &str) -> JsProcessingInstruction;
+            createProcessingInstruction(
+                target: impl IntoJs<str>,
+                data: impl IntoJs<str>,
+            ) -> JsProcessingInstruction;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createRange
             createRange() -> JsObject;
@@ -218,7 +221,7 @@ js_remote_object!(
             createTextNode(data: &str) -> JsText;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
-            createTreeWalker<T: Class<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
+            createTreeWalker<T: IntoJs<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/elementFromPoint
             elementFromPoint(x: u32, y: u32) -> Option<JsElement>;
@@ -277,26 +280,26 @@ js_remote_object!(
             hasUnpartitionedCookieAccess() -> JsPromise;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/importNode
-            importNode<T: Class<JsNode>>(node: T, deep: bool) -> T::Owned;
+            importNode<T: IntoJs<JsNode>>(node: T, deep: bool) -> T::FromJs;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector
-            querySelector(selectors: &str) -> Option<JsElement>;
+            querySelector(selectors: impl IntoJs<str>) -> Option<JsElement>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll
-            querySelectorAll(selectors: &str) -> Vec<JsElement> {
+            querySelectorAll(selectors: impl IntoJs<str>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
@@ -305,30 +308,30 @@ js_remote_object!(
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/replaceChildren
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess
             requestStorageAccess(options?: &JsRequestStorageAccessOptions) -> JsPromise;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccessFor
-            requestStorageAccessFor(origin: &str) -> JsPromise;
+            requestStorageAccessFor(origin: impl IntoJs<str>) -> JsPromise;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition
             startViewTransition(callback: Option<&JsFunction>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createExpression
-            createExpression(xpath: &str) -> JsObject;
+            createExpression(xpath: impl IntoJs<str>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate
-            evaluate<T: Class<JsNode>>(
-                xpath: &str,
+            evaluate<T: IntoJs<JsNode>>(
+                xpath: impl IntoJs<str>,
                 context_node: T,
                 namespace_resolver: Option<JsFunction>,
                 result_type: JsXpathResultType,
@@ -336,7 +339,7 @@ js_remote_object!(
             ) -> JsObject;
 
             /// Extension method
-            queryXpath(xpath: &str) -> Option<JsNode> {
+            queryXpath(xpath: impl IntoJs<str>) -> Option<JsNode> {
                 let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 for (let i = 0; i < result.snapshotLength; i++) {
                     let node = result.snapshotItem(i);
@@ -348,7 +351,7 @@ js_remote_object!(
             }
 
             /// Extension method
-            queryXpathAll(xpath: &str) -> Vec<JsNode> {
+            queryXpathAll(xpath: impl IntoJs<str>) -> Vec<JsNode> {
                 let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 let nodes = [];
                 for (let i = 0; i < result.snapshotLength; i++) {

@@ -44,9 +44,9 @@
 //!     └── ProcessingInstruction (nodeType = 7)
 //! ```
 
-use chromiumoxide_cdp::cdp::browser_protocol::dom::{BackendNodeId, NodeId};
+use chromiumoxide_cdp::cdp::browser_protocol::dom::{BackendNodeId, GetBoxModelParams, NodeId};
 use super::*;
-use crate::error::{CdpError, Result};
+use crate::{error::{CdpError, Result}, layout::{BoundingBox, BoxModel, ElementQuad}};
 
 pub mod element;
 pub mod document;
@@ -120,16 +120,16 @@ js_remote_object!(
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild
-            appendChild<T: Class<JsNode>>(child: T) -> T::Owned;
+            appendChild<T: IntoJs<JsNode>>(child: T) -> T::FromJs;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
             cloneNode(deep: bool) -> JsNode;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition
-            compareDocumentPosition<T: Class<JsNode>>(other: T) -> JsDocumentPosition;
+            compareDocumentPosition<T: IntoJs<JsNode>>(other: T) -> JsDocumentPosition;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/contains
-            contains<T: Class<JsNode>>(other: T) -> bool;
+            contains<T: IntoJs<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode
             getRootNode(composed: bool) -> JsNode;
@@ -140,17 +140,17 @@ js_remote_object!(
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/insertBefore
             insertBefore<T1, T2>(new_node: T1, reference_node: T2) -> JsNode
             where
-                T1: Class<JsNode>,
-                T2: Class<JsNode>;
+                T1: IntoJs<JsNode>,
+                T2: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isDefaultNamespace
             isDefaultNamespace(namespace_uri: &str) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isEqualNode
-            isEqualNode<T: Class<JsNode>>(other: T) -> bool;
+            isEqualNode<T: IntoJs<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isSameNode
-            isSameNode<T: Class<JsNode>>(other: T) -> bool;
+            isSameNode<T: IntoJs<JsNode>>(other: T) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupNamespaceURI
             #[rename = lookup_namespace_uri]
@@ -163,13 +163,13 @@ js_remote_object!(
             normalize() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/removeChild
-            removeChild<T: Class<JsNode>>(child: T) -> T::Owned;
+            removeChild<T: IntoJs<JsNode>>(child: T) -> T::FromJs;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild
             replaceChild<T1, T2>(new_child: T1, old_child: T2) -> JsNode
             where
-                T1: Class<JsNode>,
-                T2: Class<JsNode>;
+                T1: IntoJs<JsNode>,
+                T2: IntoJs<JsNode>;
         }
     }
 );
@@ -202,6 +202,40 @@ impl JsNode {
             }
             _ => panic!("JsNode is not a node"),
         }
+    }
+
+
+    /// Returns the box model of the node
+    pub async fn box_model(&self) -> Result<BoxModel> {
+        let model = self
+            .page()
+            .execute(
+                GetBoxModelParams::builder()
+                .backend_node_id(self.backend_node_id())
+                .build(),
+            )
+            .await?
+            .result
+            .model;
+        Ok(BoxModel {
+            content: ElementQuad::from_quad(&model.content),
+            padding: ElementQuad::from_quad(&model.padding),
+            border: ElementQuad::from_quad(&model.border),
+            margin: ElementQuad::from_quad(&model.margin),
+            width: model.width as u32,
+            height: model.height as u32,
+        })
+    }
+
+    /// Returns the bounding box of the node (relative to the main frame)
+    pub async fn bounding_box(&self) -> Result<BoundingBox> {
+        let model = self.box_model().await?;
+        let quad = model.border;
+        let x = quad.most_left();
+        let y = quad.most_top();
+        let width = quad.most_right() - x;
+        let height = quad.most_bottom() - y;
+        Ok(BoundingBox { x, y, width, height })
     }
 }
 

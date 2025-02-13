@@ -132,14 +132,14 @@ js_remote_object!(
             after<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/after
             #[rename = +text]
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/animate
             animate(keyframes: &[JsKeyframe], duration: u32) -> JsObject;
@@ -151,14 +151,14 @@ js_remote_object!(
             append<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow
             attachShadow(options: &JsAttachShadowOptions) -> JsShadowRoot;
@@ -167,14 +167,14 @@ js_remote_object!(
             before<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/before
             #[rename = +text]
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
             checkVisibility(options: &JsCheckVisibilityOptions) -> bool;
@@ -271,14 +271,14 @@ js_remote_object!(
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/prepend
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector
             querySelector(selectors: &str) -> Option<JsElement>;
@@ -309,27 +309,27 @@ js_remote_object!(
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith
             replaceWith<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith
             #[rename = +text]
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
             requestFullscreen(options: &JsRequestFullscreenOptions) -> JsPromise;

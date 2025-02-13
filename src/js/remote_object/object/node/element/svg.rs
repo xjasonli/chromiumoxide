@@ -34,8 +34,10 @@ js_remote_object!(
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/SVGElement/focus
             focus() -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/SVGElement/focus
             #[rename = +withOptions]
-            focus(options: JsFocusOptions) -> ();
+            focus(options: &JsFocusOptions) -> ();
         }
     }
 );

@@ -19,15 +19,14 @@ js_remote_object!(
 );
 
 impl JsPromise {
-    pub fn into_future<T: NativeValueFromJs>(self)
-        -> impl futures::Future<Output = Result<T>> + Send
+    pub fn into_future<T: FromJs>(self) -> impl futures::Future<Output = Result<T>> + Send
     {
         let evaluator = helper::Evaluator::new_remote(
             self.page(),
             self.clone(),
             EvalOptions {
                 await_promise: true,
-                user_gesture: false,
+                ..Default::default()
             }
         );
         evaluator.eval()

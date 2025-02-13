@@ -7,16 +7,16 @@ use crate::handler::PageInner;
 use crate::error::{CdpError, Result};
 use super::*;
 
-pub(crate) struct Evaluator {
+pub(crate) struct Evaluator<'a> {
     page: Arc<PageInner>,
-    target: EvalTarget,
+    target: EvalTarget<'a>,
     options: EvalOptions,
 }
 
-impl Evaluator {
+impl<'a> Evaluator<'a> {
     pub fn new(
         page: Arc<PageInner>,
-        target: EvalTarget,
+        target: EvalTarget<'a>,
         options: EvalOptions,
     ) -> Self {
         Self { page, target, options }
@@ -24,27 +24,26 @@ impl Evaluator {
 
     pub fn new_remote(
         page: Arc<PageInner>,
-        remote: impl Into<JsRemoteObject>,
+        object: impl AsJs<JsRemoteObject>,
         options: EvalOptions,
     ) -> Self {
-        Self::new(page, EvalTarget::Remote(remote.into()), options)
+        Self::new(page, EvalTarget::Object(object.as_js().clone()), options)
     }
 
     pub fn new_expr(
         page: Arc<PageInner>,
-        expr: impl Into<JsExpr>,
-        this: Option<JsRemoteObject>,
-        context: Option<ExecutionContext>,
+        expr: impl Into<JsExpr<'a>>,
+        expr_context: Option<JsExprContext>,
         options: EvalOptions,
     ) -> Self {
         Self::new(page, EvalTarget::Expr(
-            Expr::new(expr.into().into(), this, context)
+            ExprTarget::new(expr.into(), expr_context)
         ), options)
     }
 
     pub async fn eval<T>(self) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
         let schema = {
             let mut settings = schemars::generate::SchemaSettings::default();
@@ -69,36 +68,32 @@ impl Evaluator {
         execute(self.page, params).await
     }
 
-    pub fn invoke(self, this: Option<&JsRemoteObject>) -> FunctionInvoker {
-        FunctionInvoker::new(self.page, self.target, this.map(|t| t.clone()), self.options)
+    pub fn invoke(self) -> FunctionInvoker<'a> {
+        FunctionInvoker::new(self.page, self.target, self.options)
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum EvalTarget {
-    Remote(JsRemoteObject),
-    Expr(Expr),
+pub(crate) enum EvalTarget<'a> {
+    Object(JsRemoteObject),
+    Expr(ExprTarget<'a>),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Expr {
+pub(crate) struct ExprTarget<'a> {
     // the expression to be evaluated
-    pub(crate) expr: String,
+    pub(crate) expr: JsExpr<'a>,
 
-    // the `this` value for the expression
-    pub(crate) this: Option<JsRemoteObject>,
-
-    // execution context for the expression
-    pub(crate) context: Option<ExecutionContext>,
-
+    // the execution context for the expression
+    pub(crate) context: Option<JsExprContext>,
 }
-impl Expr {
+
+impl<'a> ExprTarget<'a> {
     pub fn new(
-        expr: String,
-        this: Option<JsRemoteObject>,
-        context: Option<ExecutionContext>,
+        expr: JsExpr<'a>,
+        context: Option<JsExprContext>,
     ) -> Self {
-        Self { expr, this, context }
+        Self { expr, context }
     }
 }
 
@@ -124,32 +119,32 @@ fn generate_function(expr_func: &str, expr_list: &[(JsonPointer, String)]) -> St
     )
 }
 
-impl EvalTarget {
+impl<'a> EvalTarget<'a> {
     pub(crate) async fn into_params(
         self,
         page: Arc<PageInner>,
-        invoke: Option<InvokeParams>,
+        invoke: Option<(Option<JsRemoteObject>, InvokeParams)>,
         schema: Schema,
         options: EvalOptions
     ) -> Result<CallFunctionOnParams> {
         let raw_params = match self {
-            EvalTarget::Remote(remote) => {
+            EvalTarget::Object(remote) => {
                 let mut remotes = vec![remote.clone()];
                 let mut expr_list = vec![];
 
-                let (func_args, expr_func) = if let Some(invoke) = invoke {
-                    let func_args = invoke.into_arguments(&mut expr_list, &mut remotes)?;
+                let (func_args, expr_func) = if let Some((this, params)) = invoke {
+                    let func_args = params.into_arguments(this, &mut expr_list, &mut remotes)?;
                     let expr_func = "this".into();
                     (func_args, expr_func)
                 } else {
-                    let func_args = InvokeParams::default().into_arguments(&mut expr_list, &mut remotes)?;
+                    let func_args = InvokeParams::default().into_arguments(None, &mut expr_list, &mut remotes)?;
                     let expr_func = "() => this".into();
                     (func_args, expr_func)
                 };
                 let expr_this = CallArgument::builder()
                     .object_id(remote.remote_id())
                     .build();
-                let context = Some(remote.into());
+                let context = remote.into();
 
                 RawParams {
                     expr_func,
@@ -160,31 +155,41 @@ impl EvalTarget {
                     remotes,
                 }
             }
-            EvalTarget::Expr(expr) => {
+            EvalTarget::Expr(expr_target) => {
                 let mut remotes = vec![];
                 let mut expr_list = vec![];
-                if let Some(ExecutionContext::RemoteObject(remote_object)) = &expr.context {
-                    remotes.push(remote_object.clone());
-                }
-                if let Some(this) = &expr.this {
-                    remotes.push(this.clone());
+                match &expr_target.context {
+                    Some(JsExprContext::This(remote)) => {
+                        remotes.push(remote.clone());
+                    }
+                    Some(JsExprContext::ContextObject(remote)) => {
+                        remotes.push(remote.clone());
+                    }
+                    _ => (),
                 }
 
-                let (func_args, expr_func) = if let Some(invoke) = invoke {
-                    let func_args = invoke.into_arguments(&mut expr_list, &mut remotes)?;
-                    let expr_func = expr.expr.into();
-                    (func_args, expr_func)
-                } else {
-                    let func_args = InvokeParams::default().into_arguments(&mut expr_list, &mut remotes)?;
-                    let expr_func = format!("()=>({})", expr.expr).into();
-                    (func_args, expr_func)
+                let (func_args, expr_func) = {
+                    if let Some((this, params)) = invoke {
+                        let func_args = params.into_arguments(this, &mut expr_list, &mut remotes)?;
+                        let expr_func = expr_target.expr.into_inner();
+                        (func_args, expr_func)
+                    } else {
+                        let func_args = InvokeParams::default().into_arguments(None, &mut expr_list, &mut remotes)?;
+                        let expr_func = format!("()=>({})", expr_target.expr.into_inner()).into();
+                        (func_args, expr_func)
+                    }
                 };
-                let expr_this = expr.this.as_ref().map(|this| {
-                    CallArgument::builder()
-                        .object_id(this.remote_id())
-                        .build()
+                let expr_this = expr_target.context.as_ref().map(|context| {
+                    match context {
+                        JsExprContext::This(remote) => {
+                            CallArgument::builder()
+                                .object_id(remote.remote_id())
+                                .build()
+                        }
+                        _ => Default::default(),
+                    }
                 }).unwrap_or_default();
-                let context = expr.context;
+                let context = expr_target.context.into();
                 RawParams {
                     expr_func,
                     expr_list,
@@ -199,16 +204,73 @@ impl EvalTarget {
     }
 }
 
-struct RawParams {
-    expr_func: Cow<'static, str>,
+enum EvalExecutionContext {
+    None,
+    Context(ExecutionContext),
+    ContextObject(JsRemoteObject),
+}
+
+impl EvalExecutionContext {
+    fn apply(self, mut params: CallFunctionOnParams) -> CallFunctionOnParams {
+        match self {
+            Self::None => params,
+            Self::Context(ExecutionContext::Id(id)) => {
+                params.execution_context_id = Some(id);
+                params
+            }
+            Self::Context(ExecutionContext::UniqueId(unique_id)) => {
+                params.unique_context_id = Some(unique_id);
+                params
+            }
+            Self::ContextObject(remote) => {
+                params.object_id = Some(remote.remote_id());
+                params
+            }
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
+impl From<JsRemoteObject> for EvalExecutionContext {
+    fn from(remote: JsRemoteObject) -> Self {
+        Self::ContextObject(remote)
+    }
+}
+
+impl From<JsExprContext> for EvalExecutionContext {
+    fn from(context: JsExprContext) -> Self {
+        match context {
+            JsExprContext::This(remote) | JsExprContext::ContextObject(remote) => {
+                Self::from(remote)
+            }
+            JsExprContext::Context(context) => {
+                Self::Context(context)
+            }
+        }
+    }
+}
+impl From<Option<JsExprContext>> for EvalExecutionContext {
+    fn from(context: Option<JsExprContext>) -> Self {
+        match context {
+            Some(context) => context.into(),
+            None => Self::None,
+        }
+    }
+}
+
+struct RawParams<'a> {
+    expr_func: Cow<'a, str>,
     expr_list: Vec<(JsonPointer, String)>,
     expr_this: CallArgument,
     func_args: Vec<CallArgument>,
-    context: Option<ExecutionContext>,
+    context: EvalExecutionContext,
     remotes: Vec<JsRemoteObject>,
 }
 
-impl RawParams {
+impl<'a> RawParams<'a> {
     async fn into_params(
         self,
         page: Arc<PageInner>,
@@ -216,14 +278,16 @@ impl RawParams {
         options: EvalOptions,
     ) -> Result<CallFunctionOnParams> {
         let context = {
-            if let Some(context) = self.context {
-                context
-            } else if let Some(remote_object) = self.remotes.first() {
-                ExecutionContext::RemoteObject(remote_object.clone())
+            if self.context.is_none() {
+                if let Some(remote_object) = self.remotes.first() {
+                    EvalExecutionContext::ContextObject(remote_object.clone())
+                } else {
+                    let context_id = page.execution_context().await?
+                        .ok_or_else(|| CdpError::msg("No execution context found"))?;
+                    EvalExecutionContext::Context(context_id.into())
+                }
             } else {
-                let context_id = page.execution_context().await?
-                    .ok_or_else(|| CdpError::msg("No execution context found"))?;
-                ExecutionContext::Id(context_id)
+                self.context
             }
         };
 

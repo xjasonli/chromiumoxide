@@ -5,23 +5,23 @@ use crate::handler::PageInner;
 
 use super::*;
 
-pub async fn eval_global<R: NativeValueFromJs>(
+pub async fn eval_global<'a, R: FromJs>(
     page: Arc<PageInner>,
-    expr: impl Into<String>,
-    context: Option<GlobalExecutionContext>,
+    expr: impl Into<JsExpr<'a>>,
+    execution_context: Option<ExecutionContext>,
     options: EvalOptions,
 ) -> Result<R> {
     let mut params = EvaluateParams::builder()
-        .expression(expr.into())
+        .expression(expr.into().into_inner())
         .return_by_value(false)
         .user_gesture(options.user_gesture)
         .await_promise(options.await_promise)
         .build()
         .unwrap();
-    if let Some(context) = context {
+    if let Some(context) = execution_context {
         match context {
-            GlobalExecutionContext::Id(id) => params.context_id = Some(id),
-            GlobalExecutionContext::UniqueId(id) => params.unique_context_id = Some(id),
+            ExecutionContext::Id(id) => params.context_id = Some(id),
+            ExecutionContext::UniqueId(id) => params.unique_context_id = Some(id),
         }
     }
     let resp = page.execute(params).await?.result;
@@ -48,12 +48,12 @@ pub async fn eval_global<R: NativeValueFromJs>(
                 return evaluator.eval().await;
             }
             SpecialValue::BigInt(big_int) => {
-                page.invoke_function("(x) => x", None)
+                page.invoke_function("(x) => x")
                     .argument(big_int)?
                     .invoke().await
             }
             SpecialValue::Undefined(undefined) => {
-                page.invoke_function("(x) => x", None)
+                page.invoke_function("(x) => x")
                     .argument(undefined)?
                     .invoke().await
             }

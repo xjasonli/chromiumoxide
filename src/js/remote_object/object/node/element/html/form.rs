@@ -52,7 +52,7 @@ js_remote_object!(
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit
             #[rename = +withSubmitter]
-            requestSubmit<T: Class<JsHtmlElement>>(submitter?: T) -> ();
+            requestSubmit<T: IntoJs<JsHtmlElement>>(submitter: T) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/reset
             reset() -> ();

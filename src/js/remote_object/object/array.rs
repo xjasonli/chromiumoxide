@@ -32,7 +32,7 @@ js_remote_object!(
             }
 
             // Extension method
-            toVec<T: NativeValueFromJs>() -> Vec<T> {
+            toVec<T: FromJs>() -> Vec<T> {
                 if Array.isArray(this) {
                     return this;
                 } else {
@@ -46,14 +46,14 @@ js_remote_object!(
 impl JsArrayLike {
     pub async fn get_element<T>(&self, index: usize) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
         self.get_property(format!("{}", index)).await
     }
 
     pub async fn set_element<T>(&self, index: usize, value: T) -> Result<()>
     where
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
         self.set_property(format!("{}", index), value).await
     }

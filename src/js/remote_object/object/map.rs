@@ -14,25 +14,29 @@ js_remote_object!(
             clear() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/delete
-            delete<K: NativeValueIntoJs>(key: K) -> bool;
+            delete<K: IntoJs>(key: K) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/entries
             entries() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/forEach
-            forEach(callback: Function, this_arg?: &JsRemoteObject) -> ();
+            forEach(callback: impl IntoJs<JsFunction>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/forEach
+            #[rename = + withThis]
+            forEach(callback: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/get
-            get<K: NativeValueIntoJs, V: NativeValueFromJs>(key: K) -> Optional<V>;
+            get<K: IntoJs, V: FromJs>(key: K) -> Optional<V>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/has
-            has<K: NativeValueIntoJs>(key: K) -> bool;
+            has<K: IntoJs>(key: K) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/keys
             keys() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/set
-            set<K: NativeValueIntoJs, V: NativeValueIntoJs>(key: K, value: V) -> Self;
+            set<K: IntoJs, V: IntoJs>(key: K, value: V) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/values
             values() -> JsIterator;

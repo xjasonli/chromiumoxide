@@ -1236,11 +1236,30 @@ impl Page {
     /// ```no_run
     /// # use chromiumoxide::page::Page;
     /// # use chromiumoxide::error::Result;
+    /// # use chromiumoxide::js::{JsObject, ScopedEvalParams};
     /// # async fn demo(page: &Page) -> Result<()> {
-    /// // Function only exists within this evaluation
-    /// let result1 = page.eval("function add(a, b) { return a + b; }; add(1, 2)").await?;
-    /// // This would fail as the add function is no longer accessible
-    /// // let result2 = page.eval("add(3, 4)").await?; // Would throw ReferenceError
+    /// // Simple expression
+    /// let result = page.eval("((a, b) => a + b)(1, 2)").await?;
+    /// 
+    /// // Use arrow function
+    /// let result = page.eval("(a => a * 2)(21)").await?;
+    /// 
+    /// // Evaluate with this context
+    /// let context: JsObject = page.eval("{ value: 42 }").await?;
+    /// let params = ScopedEvalParams::new("this.value * 2").expr_this(context);
+    /// let result: i32 = page.eval(params).await?;
+    /// assert_eq!(result, 84);
+    /// 
+    /// // Complex this context
+    /// let obj: JsObject = page.eval(r#"{
+    ///     name: "test",
+    ///     data: { count: 10 },
+    ///     getValue() { return this.data.count; }
+    /// }"#).await?;
+    /// 
+    /// let params = ScopedEvalParams::new("this.getValue() + this.data.count").expr_this(obj);
+    /// let result: i32 = page.eval(params).await?;
+    /// assert_eq!(result, 20); // 10 + 10
     /// # Ok(())
     /// # }
     /// ```
@@ -1255,9 +1274,9 @@ impl Page {
     /// Returns an error if:
     /// * The JavaScript execution fails
     /// * The result cannot be converted to type `T`
-    pub async fn eval<T: js::NativeValueFromJs>(
+    pub async fn eval<'a, T: js::FromJs>(
         &self,
-        params: impl Into<js::EvalParams>,
+        params: impl Into<js::ScopedEvalParams<'a>>,
     ) -> Result<T> {
         self.inner.eval(params).await
     }
@@ -1294,9 +1313,9 @@ impl Page {
     /// Returns an error if:
     /// * The JavaScript execution fails
     /// * The result cannot be converted to type `R`
-    pub async fn eval_global<R: js::NativeValueFromJs>(
+    pub async fn eval_global<'a, R: js::FromJs>(
         &self,
-        params: impl Into<js::EvalGlobalParams>,
+        params: impl Into<js::GlobalEvalParams<'a>>,
     ) -> Result<R> {
         self.inner.eval_global(params).await
     }
@@ -1311,57 +1330,90 @@ impl Page {
     /// ```no_run
     /// # use chromiumoxide::page::Page;
     /// # use chromiumoxide::error::Result;
-    /// # use chromiumoxide::js::JsObject;
+    /// # use chromiumoxide::js::{JsObject, ScopedEvalParams};
     /// # async fn demo(page: &Page) -> Result<()> {
-    /// // Basic function invocation
-    /// let result = page.invoke_function(
-    ///     "(x) => x + 1",
-    ///     None,
-    /// ).await?
+    /// // Method 1: Single argument with argument()
+    /// let result = page.invoke_function("(x) => x + 1")
     ///     .argument(1)?
     ///     .invoke::<i32>()
     ///     .await?;
     /// assert_eq!(result, 2);
     /// 
-    /// // Function with multiple arguments
-    /// let result = page.invoke_function(
-    ///     "(x, y) => x * y",
-    ///     None,
-    /// ).await?
-    ///     .argument(6)?
-    ///     .argument(7)?
+    /// // Method 2: Multiple arguments with arguments()
+    /// let result = page.invoke_function("(x, y, z) => x + y + z")
+    ///     .arguments((1, 2, 3))?
     ///     .invoke::<i32>()
     ///     .await?;
-    /// assert_eq!(result, 42);
+    /// assert_eq!(result, 6);
     /// 
-    /// // Function with custom this context
-    /// let context: JsObject = page.eval("({ multiplier: 2 })").await?;
-    /// let result = page.invoke_function(
-    ///     "function(x) { return x * this.multiplier; }",
-    ///     Some(&context),
-    /// ).await?
-    ///     .argument(10)?
+    /// // Method 3: Arguments from iterator with arguments_spread()
+    /// let args = vec![1, 2, 3, 4];
+    /// let result = page.invoke_function("(...nums) => nums.reduce((a, b) => a + b)")
+    ///     .arguments_spread(args)?
     ///     .invoke::<i32>()
     ///     .await?;
-    /// assert_eq!(result, 20);
+    /// assert_eq!(result, 10);
+    /// 
+    /// // Method 4: Call object method with this binding
+    /// let obj: JsObject = page.eval(r#"{
+    ///     base: 100,
+    ///     multiplier: 2,
+    ///     compute(x) { 
+    ///         // this.base and this.multiplier are bound at runtime
+    ///         return (x + this.base) * this.multiplier;
+    ///     }
+    /// }"#).await?;
+    /// 
+    /// // Use expr_this to get method from object
+    /// let params = ScopedEvalParams::new("this.compute").expr_this(obj.clone());
+    /// let result = page.invoke_function(params)
+    ///     .this(obj)  // Set this binding for method execution
+    ///     .argument(50)?
+    ///     .invoke::<i32>()
+    ///     .await?;
+    /// assert_eq!(result, 300); // (50 + 100) * 2
+    /// 
+    /// // Method 5: Call nested object method
+    /// let obj: JsObject = page.eval(r#"{
+    ///     data: {
+    ///         items: [1, 2, 3],
+    ///         multiplier: 10
+    ///     },
+    ///     utils: {
+    ///         transform(arr) { 
+    ///             // this points to the root object
+    ///             return arr.map(x => x * this.data.multiplier);
+    ///         }
+    ///     }
+    /// }"#).await?;
+    /// 
+    /// // Use expr_this to get nested method
+    /// let params = ScopedEvalParams::new("this.utils.transform").expr_this(obj.clone());
+    /// let result = page.invoke_function(params)
+    ///     .this(obj)  // Set this binding for method execution
+    ///     .argument(obj.get_property::<Vec<i32>>("data.items").await?)?
+    ///     .invoke::<Vec<i32>>()
+    ///     .await?;
+    /// assert_eq!(result, vec![10, 20, 30]);
     /// # Ok(())
     /// # }
     /// ```
     ///
     /// # Arguments
     /// * `params` - JavaScript function code or evaluation parameters
-    /// * `this` - Optional object to use as `this` context when executing the function
     ///
     /// # Returns
     /// Returns a `FunctionInvoker` that provides methods to:
-    /// * Add arguments with `argument()`
+    /// * Add single argument with `argument()`
+    /// * Add multiple arguments with `arguments()`
+    /// * Add iterator arguments with `arguments_spread()`
+    /// * Set this context with `this()`
     /// * Execute the function with `invoke()`
-    pub fn invoke_function(
+    pub fn invoke_function<'a>(
         &self,
-        params: impl Into<js::EvalParams>,
-        this: Option<&js::JsRemoteObject>,
-    ) -> js::FunctionInvoker {
-        self.inner.invoke_function(params, this)
+        params: impl Into<js::ScopedEvalParams<'a>>,
+    ) -> js::FunctionInvoker<'a> {
+        self.inner.invoke_function(params)
     }
 
     /// Exposes a Rust function in the page's JavaScript context.
@@ -1429,8 +1481,8 @@ impl Page {
         F: js::ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: js::ExposableFnError + 'f,
-        R: js::NativeValueIntoJs + 'f,
-        for<'a> A: js::FunctionNativeArgsFromJs + 'a,
+        R: js::IntoJs + 'f,
+        for<'a> A: js::FromJsArgs + 'a,
     {
         self.inner.expose_function(name.into(), function).await
     }

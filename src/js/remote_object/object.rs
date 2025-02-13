@@ -53,7 +53,7 @@ js_remote_object!(
             objectAssign<I, T>(...sources: I) -> Self
             where
                 I: IntoIterator<Item = T>,
-                T: NativeValueIntoJs {
+                T: IntoJs {
                 return Object.assign(this, ...sources);
             }
 
@@ -65,13 +65,13 @@ js_remote_object!(
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
             /// 
             #[rename = + withProperties]
-            objectCreate<T: NativeValueIntoJs>(properties: T) -> Self {
+            objectCreate<T: IntoJs>(properties: T) -> Self {
                 return Object.create(this, properties);
             }
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperties
             /// 
-            objectDefineProperties<T: NativeValueIntoJs>(properties: T) -> Self {
+            objectDefineProperties<T: IntoJs>(properties: T) -> Self {
                 return Object.defineProperties(this, properties);
             }
 
@@ -121,6 +121,25 @@ pub struct JsAccessorDescriptor {
     set: JsFunction,
     configurable: bool,
     enumerable: bool,
+}
+
+js_remote_object!{
+    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+    class EventTarget extends Object {
+        static #subtype: "none";
+        static #class: "EventTarget";
+
+        methods: {
+            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+            addEventListener(name: &str, listener: JsFunction, options?: JsObject) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener
+            removeEventListener(name: &str, listener: JsFunction, options?: JsObject) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
+            dispatchEvent(event: JsObject) -> bool;
+        }
+    }
 }
 
 js_remote_object!(
@@ -190,7 +209,7 @@ js_remote_object!(
             reload() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Location/replace
-            replace<T: NativeValueIntoJs>(url: T) -> ();
+            replace<T: IntoJs>(url: T) -> ();
         }
     }
 );

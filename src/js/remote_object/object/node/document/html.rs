@@ -68,7 +68,7 @@ js_remote_object!(
             close() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByName
-            getElementsByName<T: Class<str>>(name: T) -> JsNodeList;
+            getElementsByName<T: IntoJs<str>>(name: T) -> JsNodeList;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/hasFocus
             hasFocus() -> bool;
@@ -77,7 +77,7 @@ js_remote_object!(
             open() -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/write
-            write<T: Class<str>>(text: T) -> ();
+            write<T: IntoJs<str>>(text: T) -> ();
         }
     }
 );

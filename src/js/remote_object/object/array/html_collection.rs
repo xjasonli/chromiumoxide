@@ -10,7 +10,7 @@ js_remote_object!(
             item(index: usize) -> Option<JsElement>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLCollection/namedItem
-            namedItem(name: &str) -> Option<JsElement>;
+            namedItem(name: impl IntoJs<str>) -> Option<JsElement>;
         }
     }
 );

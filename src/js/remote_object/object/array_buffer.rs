@@ -26,10 +26,10 @@ js_remote_object!(
             slice(start?: usize, end?: usize) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transfer
-            transfer(new_byte_length: Optional<usize>) -> Self;
+            transfer(new_byte_length?: usize) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transferToFixedLength
-            transferToFixedLength(new_byte_length: Optional<usize>) -> Self;
+            transferToFixedLength(new_byte_length?: usize) -> Self;
         }
     }
 );

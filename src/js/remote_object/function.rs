@@ -32,12 +32,15 @@ js_remote_object!(
 );
 
 impl JsFunction {
-    pub fn invoke(&self, this: Option<&JsRemoteObject>, options: EvalOptions) -> FunctionInvoker {
-        let evaluator = helper::Evaluator::new_remote(
+    pub fn invoke(&self) -> FunctionInvoker<'static> {
+        self.invoke_with_options(EvalOptions::default())
+    }
+
+    pub fn invoke_with_options(&self, options: EvalOptions) -> FunctionInvoker<'static> {
+        helper::Evaluator::new_remote(
             self.page(),
             self.clone(),
             options
-        );
-        evaluator.invoke(this)
+        ).invoke()
     }
 }

@@ -34,33 +34,33 @@ js_remote_object!(
             append<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelector
-            querySelector(selectors: &str) -> Option<JsElement>;
+            querySelector(selectors: impl IntoJs<str>) -> Option<JsElement>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelectorAll
-            querySelectorAll(selectors: &str) -> Vec<JsElement> {
+            querySelectorAll(selectors: impl IntoJs<str>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
@@ -69,20 +69,20 @@ js_remote_object!(
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<JsNode>;
+                T: IntoJs<JsNode>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/replaceChildren
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: Class<str>;
+                T: IntoJs<str>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/getElementById
-            getElementById(id: &str) -> Option<JsElement>;
+            getElementById(id: impl IntoJs<str>) -> Option<JsElement>;
 
             /// Extension
-            queryXpath(xpath: &str) -> Option<JsNode> {
+            queryXpath(xpath: impl IntoJs<str>) -> Option<JsNode> {
                 let document = this.ownerDocument;
                 let result = document.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 for (let i = 0; i < result.snapshotLength; i++) {
@@ -95,7 +95,7 @@ js_remote_object!(
             }
 
             /// Extension
-            queryXpathAll(xpath: &str) -> Vec<JsNode> {
+            queryXpathAll(xpath: impl IntoJs<str>) -> Vec<JsNode> {
                 let document = this.ownerDocument;
                 let result = document.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 let nodes = [];

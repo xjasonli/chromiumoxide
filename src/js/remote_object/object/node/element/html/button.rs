@@ -64,7 +64,7 @@ js_remote_object!(
             reportValidity() -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLButtonElement/setCustomValidity
-            setCustomValidity<T: Class<str>>(message: T) -> ();
+            setCustomValidity<T: IntoJs<str>>(message: T) -> ();
         }
     }
 );

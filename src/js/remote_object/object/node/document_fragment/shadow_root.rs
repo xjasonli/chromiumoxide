@@ -52,7 +52,7 @@ js_remote_object!(
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/ShadowRoot/setHTMLUnsafe
             #[rename = set_html_unsafe]
-            setHTMLUnsafe<T: Class<str>>(html: T) -> ();
+            setHTMLUnsafe<T: IntoJs<str>>(html: T) -> ();
         }
     }
 );

@@ -103,7 +103,7 @@ impl JsRemoteObject {
     /// }
     /// # }
     /// ```
-    pub fn is_instance_of<T: Subclass<Self>>(&self) -> bool {
+    pub fn is_instance_of<T: DerivedJs<Self>>(&self) -> bool {
         T::is_instance(self)
     }
 
@@ -123,8 +123,8 @@ impl JsRemoteObject {
     /// }
     /// # }
     /// ```
-    pub fn downcast<T: Subclass<Self>>(&self) -> Option<<T as Class<Self>>::Owned> {
-        T::try_from_super(self.clone())
+    pub fn downcast<T: DerivedJs<Self>>(&self) -> Option<T::FromJs> {
+        T::downcast_from(self.clone())
     }
 
     /// Evaluates a JavaScript expression in the context of this object.
@@ -148,15 +148,11 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn eval<T: NativeValueFromJs>(
+    pub async fn eval<'a, T: FromJs>(
         &self,
-        expr: impl Into<String>,
-        options: EvalOptions
+        params: impl Into<EvalParams<'a>>,
     ) -> Result<T> {
-        let params = EvalParams::new(expr)
-            .this(self)
-            .options(options);
-
+        let params = params.into().into_scoped().expr_this(self);
         self.page().eval(params).await
     }
 
@@ -185,23 +181,31 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_function(&self, function: impl Into<Function>, options: EvalOptions) -> FunctionInvoker {
-        let function = function.into();
-        let evaluator = match function {
-            Function::Func(function) => helper::Evaluator::new_remote(
-                self.page(),
-                function,
-                options
-            ),
-            Function::Expr(expr) => helper::Evaluator::new_expr(
-                self.page(),
-                expr,
-                Some(self.clone()),
-                None,
-                options
-            ),
-        };
-        evaluator.invoke(Some(self))
+    pub fn invoke_function<'a>(&self, function: impl Into<JsExpr<'a>>) -> FunctionInvoker<'a> {
+        self.invoke_function_with_options(function, EvalOptions::default())
+    }
+
+    /// Invokes a function on this object with the given evaluation options.
+    /// 
+    /// This method allows executing JavaScript functions in the context of the current object.
+    /// The function can be specified either as a `JsFunction` object or as a string expression.
+    /// 
+    /// # Arguments
+    /// * `function` - The function to invoke, either as a `JsFunction` or string expression
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the function
+    pub fn invoke_function_with_options<'a>(
+        &self,
+        function: impl Into<JsExpr<'a>>,
+        options: EvalOptions,
+    ) -> FunctionInvoker<'a> {
+        let params = ScopedEvalParams::new(function)
+            .expr_this(self.clone())
+            .options(options);
+        self.page().invoke_function(params)
+            .this(self.clone())
     }
 
     /// Invokes a method on this object.
@@ -228,11 +232,26 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_method(&self, name: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
-        let function = "(name, ...args) => {{ return this[name](...args); }}";
-        self.invoke_function(function, options)
-            .argument(name.into())
-            .unwrap() // String serializing is infallible
+    pub fn invoke_method(&self, name: impl IntoJs) -> FunctionInvoker<'static> {
+        self.invoke_method_with_options(name, EvalOptions::default())
+    }
+
+    /// Invokes a method on this object with the given evaluation options.
+    /// 
+    /// This method allows executing JavaScript methods in the context of the current object.
+    /// The method can be specified either as a string expression or as a `JsFunction` object.
+    /// 
+    /// # Arguments
+    /// * `name` - The name of the method to invoke
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the method
+    pub fn invoke_method_with_options(&self, name: impl IntoJs, options: EvalOptions) -> FunctionInvoker<'static> {
+        const FUNCTION: JsExpr<'static> = js_expr![ (name, ...args) => this[name](...args) ];
+        self.invoke_function_with_options(FUNCTION, options)
+            .argument(name)
+            .expect("string serializing is infallible")
     }
 
     /// Invokes a well-known Symbol method on this object.
@@ -251,9 +270,26 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_symbol_method(&self, symbol: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
-        let expr = format!("this[Symbol.{}](...arguments)", symbol.into());
-        self.invoke_function(expr, options)
+    pub fn invoke_well_known_symbol_method(&self, symbol: impl IntoJs<str>) -> FunctionInvoker<'static> {
+        self.invoke_well_known_symbol_method_with_options(symbol, EvalOptions::default())
+    }
+
+    /// Invokes a Symbol method on this object with the given evaluation options.
+    /// 
+    /// This method executes a method referenced by a well-known Symbol (like `Symbol.iterator`).
+    /// The method is called with `this` bound to the current object.
+    /// 
+    /// # Arguments
+    /// * `symbol` - The well-known Symbol to invoke
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the method
+    pub fn invoke_well_known_symbol_method_with_options(&self, symbol: impl IntoJs<str>, options: EvalOptions) -> FunctionInvoker<'static> {
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol[symbol]](...args) ];
+        self.invoke_function_with_options(FUNCTION, options)
+            .argument(symbol)
+            .expect("string serializing is infallible")
     }
 
     /// Invokes a Symbol method registered with `Symbol.for()` on this object.
@@ -272,11 +308,26 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_symbol_method_for(&self, symbol: impl Into<String>, options: EvalOptions) -> FunctionInvoker {
-        let function = "(symbol, ...args) => {{ return this[Symbol.for(symbol)](...args); }}";
-        self.invoke_function(function, options)
-            .argument(symbol.into())
-            .unwrap() // String serializing is infallible
+    pub fn invoke_symbol_method_for(&self, symbol: impl IntoJs<str>) -> FunctionInvoker<'static> {
+        self.invoke_symbol_method_for_with_options(symbol, EvalOptions::default())
+    }
+
+    /// Invokes a Symbol method registered with `Symbol.for()` on this object with the given evaluation options.
+    /// 
+    /// This method executes a method referenced by a Symbol registered in the global Symbol registry.
+    /// The method is called with `this` bound to the current object.
+    /// 
+    /// # Arguments
+    /// * `symbol` - The Symbol to invoke
+    /// * `options` - Evaluation options like timeout and execution context
+    /// 
+    /// # Returns
+    /// A `FunctionInvoker` that can be used to add arguments and execute the method
+    pub fn invoke_symbol_method_for_with_options(&self, symbol: impl IntoJs<str>, options: EvalOptions) -> FunctionInvoker<'static> {
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol.for(symbol)](...args) ];
+        self.invoke_function_with_options(FUNCTION, options)
+            .argument(symbol)
+            .expect("string serializing is infallible")
     }
 
     /// Gets a property value from this object.
@@ -284,7 +335,11 @@ impl JsRemoteObject {
     /// This method retrieves a property value by name and converts it to the specified Rust type.
     /// 
     /// # Arguments
-    /// * `name` - The name of the property to get
+    /// * `name` - The property key to get. Can be:
+    ///   - String compatible types (String, &str, etc.)
+    ///   - Number types (i32, f64, etc.) for array indices
+    ///   - Symbol objects (JsSymbol)
+    ///   - Any JavaScript expression (JsExpr) that evaluates to a valid property key
     /// 
     /// # Returns
     /// The property value converted to type `T`
@@ -293,18 +348,28 @@ impl JsRemoteObject {
     /// ```no_run
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Get string property
     /// let title: String = obj.get_property("title").await?;
-    /// let count: i32 = obj.get_property("count").await?;
+    /// 
+    /// // Get array element by index
+    /// let first: String = obj.get_property(0).await?;
+    /// 
+    /// // Get property by Symbol
+    /// let symbol = page.eval::<JsSymbol>("Symbol.iterator").await?;
+    /// let iterator = obj.get_property(symbol).await?;
+    /// 
+    /// // Get property by expression
+    /// let prop = obj.get_property(js_expr![Symbol.for("mySymbol")]).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_property<T>(&self, name: impl Into<String>) -> Result<T>
+    pub async fn get_property<T>(&self, name: impl IntoJs) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
-        let function = "(name) => {{ return this[name]; }}";
-        self.invoke_function(function, EvalOptions::default())
-            .argument(name.into())?
+        const FUNCTION: JsExpr<'static> = js_expr![(name) => this[name]];
+        self.invoke_function(FUNCTION)
+            .argument(name)?
             .invoke::<T>().await
     }
 
@@ -318,16 +383,18 @@ impl JsRemoteObject {
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
     /// // Get Symbol.toStringTag property
-    /// let tag: String = obj.get_symbol_property("toStringTag").await?;
+    /// let tag: String = obj.get_well_known_symbol_property("toStringTag").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_symbol_property<T>(&self, symbol: impl Into<String>) -> Result<T>
+    pub async fn get_well_known_symbol_property<T>(&self, symbol: impl IntoJs<str>) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
-        let expr = format!("this[Symbol.{}])", symbol.into());
-        self.eval(expr, EvalOptions::default()).await
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol) => this[Symbol[symbol]] ];
+        self.invoke_function(FUNCTION)
+            .argument(symbol)?
+            .invoke::<T>().await
     }
 
     /// Gets a property value referenced by a Symbol from the global registry.
@@ -344,13 +411,13 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_symbol_property_for<T>(&self, symbol: impl Into<String>) -> Result<T>
+    pub async fn get_symbol_property_for<T>(&self, symbol: impl IntoJs<str>) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
-        let function = "(symbol) => {{ return this[Symbol.for(symbol)]; }}";
-        self.invoke_function(function, EvalOptions::default())
-            .argument(symbol.into())?
+        const FUNCTION: JsExpr<'static> = js_expr![ (name) => this[Symbol.for(name)] ];
+        self.invoke_function(FUNCTION)
+            .argument(symbol)?
             .invoke::<T>().await
     }
 
@@ -371,13 +438,13 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_property<T>(&self, name: impl Into<String>, value: T) -> Result<()>
+    pub async fn set_property<T>(&self, name: impl IntoJs, value: T) -> Result<()>
     where
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
-        let function = "(name, value) => {{ this[name] = value; }}";
-        self.invoke_function(function, EvalOptions::default())
-            .argument(name.into())?
+        const FUNCTION: JsExpr<'static> = js_expr![ (name, value) => this[name] = value ];
+        self.invoke_function(FUNCTION)
+            .argument(name)?
             .argument(value)?
             .invoke().await
     }
@@ -392,16 +459,17 @@ impl JsRemoteObject {
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # async fn example(obj: JsRemoteObject) -> Result<(), Box<dyn std::error::Error>> {
     /// // Set Symbol.toStringTag property
-    /// obj.set_symbol_property("toStringTag", "MyObject").await?;
+    /// obj.set_well_known_symbol_property("toStringTag", "MyObject").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_symbol_property<T>(&self, symbol: impl Into<String>, value: T) -> Result<()>
+    pub async fn set_well_known_symbol_property<T>(&self, symbol: impl IntoJs<str>, value: T) -> Result<()>
     where
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
-        let function = format!("(value) => {{ this[Symbol.{} = value; }}", symbol.into());
-        self.invoke_function(function, EvalOptions::default())
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => this[Symbol[symbol]] = value ];
+        self.invoke_function(FUNCTION)
+            .argument(symbol)?
             .argument(value)?
             .invoke().await
     }
@@ -420,13 +488,13 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_symbol_property_for<T>(&self, symbol: impl Into<String>, value: T) -> Result<()>
+    pub async fn set_symbol_property_for<T>(&self, symbol: impl IntoJs<str>, value: T) -> Result<()>
     where
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
-        let function = "(symbol, value) => {{ this[Symbol.for(symbol)] = value; }}";
-        self.invoke_function(function, EvalOptions::default())
-            .argument(symbol.into())?
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => this[Symbol.for(symbol)] = value ];
+        self.invoke_function(FUNCTION)
+            .argument(symbol)?
             .argument(value)?
             .invoke().await
     }
@@ -480,10 +548,19 @@ impl schemars::JsonSchema for JsRemoteObject {
 }
 
 impl private::Sealed for JsRemoteObject {}
-impl Class<JsRemoteObject> for JsRemoteObject {
-    type Owned = Self;
-    fn as_ref(&self) -> &JsRemoteObject { self }
+impl IntoJs<JsRemoteObject> for JsRemoteObject {
+    type FromJs = JsRemoteObject;
 }
+impl<'a> IntoJs<JsRemoteObject> for &'a JsRemoteObject {
+    type FromJs = JsRemoteObject;
+}
+impl<'a> IntoJs<JsRemoteObject> for &'a mut JsRemoteObject {
+    type FromJs = JsRemoteObject;
+}
+impl AsJs<JsRemoteObject> for JsRemoteObject {
+    fn as_js(&self) -> &JsRemoteObject { self }
+}
+
 
 /// Internal storage for JsRemoteObject.
 /// 

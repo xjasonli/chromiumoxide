@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::js::native_value::FunctionNativeArgsIntoJs;
+use crate::js::traits::IntoJsArgs;
 
 /// Write to file with configured runtime
 pub(crate) async fn write<P: AsRef<Path> + Unpin, C: AsRef<[u8]>>(
@@ -68,7 +68,7 @@ pub(crate) mod base64 {
 
 /// Creates a javascript function string as `(<function>)("<param 1>", "<param
 /// 2>")`
-pub fn evaluation_string<Args: FunctionNativeArgsIntoJs>(
+pub fn evaluation_string<Args: IntoJsArgs>(
     function: impl AsRef<str>,
     params: Args
 ) -> Result<String, serde_json::Error> {

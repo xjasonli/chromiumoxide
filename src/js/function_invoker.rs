@@ -33,21 +33,26 @@ use super::*;
 /// # }
 /// ```
 #[derive(Debug, Clone)]
-pub struct FunctionInvoker {
+pub struct FunctionInvoker<'a> {
     page: Arc<PageInner>,
-    target: helper::EvalTarget,
+    target: helper::EvalTarget<'a>,
+    this: Option<JsRemoteObject>,
     params: InvokeParams,
     options: EvalOptions,
 }
 
-impl FunctionInvoker {
+impl<'a> FunctionInvoker<'a> {
     pub(crate) fn new(
         page: Arc<PageInner>,
-        target: helper::EvalTarget,
-        this: Option<JsRemoteObject>,
+        target: helper::EvalTarget<'a>,
         options: EvalOptions
     ) -> Self {
-        Self { page, target, params: InvokeParams::new(this), options }
+        Self { page, target, this: None, params: InvokeParams::new(), options }
+    }
+
+    pub fn this<T: AsJs<JsRemoteObject>>(mut self, this: T) -> Self {
+        self.this = Some(this.as_js().clone());
+        self
     }
 
     /// Adds a single argument to the function call.
@@ -59,7 +64,7 @@ impl FunctionInvoker {
     /// 
     /// # Returns
     /// Returns self for method chaining
-    pub fn argument<T: NativeValueIntoJs>(mut self, argument: T) -> Result<Self> {
+    pub fn argument<T: IntoJs>(mut self, argument: T) -> Result<Self> {
         self.params.argument(argument)?;
         Ok(self)
     }
@@ -76,7 +81,7 @@ impl FunctionInvoker {
     /// Returns self for method chaining
     pub fn arguments<Args>(mut self, arguments: Args) -> Result<Self>
     where
-        Args: FunctionNativeArgsIntoJs,
+        Args: IntoJsArgs,
     {
         self.params.arguments(arguments)?;
         Ok(self)
@@ -111,7 +116,7 @@ impl FunctionInvoker {
     pub fn arguments_spread<I, T>(mut self, arguments: I) -> Result<Self>
     where
         I: IntoIterator<Item = T>,
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
         self.params.arguments_spread(arguments)?;
         Ok(self)
@@ -129,7 +134,7 @@ impl FunctionInvoker {
     /// Returns the function's return value converted to type `T`
     pub async fn invoke<T>(self) -> Result<T>
     where
-        T: NativeValueFromJs,
+        T: FromJs,
     {
         let schema = {
             let mut settings = schemars::generate::SchemaSettings::default();
@@ -147,7 +152,7 @@ impl FunctionInvoker {
     pub(crate) async fn invoke_with_schema(self, schema: Schema) -> Result<JsonValue> {
         let params = self.target.into_params(
             self.page.clone(),
-            Some(self.params),
+            Some((self.this, self.params)),
             schema,
             self.options
         ).await?;
@@ -158,7 +163,7 @@ impl FunctionInvoker {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct InvokeParams {
     // `this` context for the function
-    pub(crate) this: Option<JsRemoteObject>,
+    //pub(crate) this: Option<JsRemoteObject>,
 
     // Arguments to pass to the function
     pub(crate) arguments: Vec<JsonValue>,
@@ -169,16 +174,12 @@ pub(crate) struct InvokeParams {
 
 impl InvokeParams {
     /// Creates a new parameter set with the given `this` context.
-    pub fn new(this: Option<JsRemoteObject>) -> Self {
-        let mut remotes = vec![];
-        if let Some(this) = &this {
-            remotes.push(this.clone());
-        }
-        Self { this, arguments: vec![], remotes }
+    pub fn new() -> Self {
+        Self { arguments: vec![], remotes: vec![] }
     }
 
     /// Adds a single argument value.
-    pub fn argument<T: NativeValueIntoJs>(&mut self, value: T) -> Result<()> {
+    pub fn argument<T: IntoJs>(&mut self, value: T) -> Result<()> {
         self.arguments.push(serde_json::to_value(value)?);
         Ok(())
     }
@@ -186,7 +187,7 @@ impl InvokeParams {
     /// Adds multiple arguments from a tuple.
     pub fn arguments<Args>(&mut self, arguments: Args) -> Result<()>
     where
-        Args: FunctionNativeArgsIntoJs,
+        Args: IntoJsArgs,
     {
         self.arguments.extend(Args::into_json_values(arguments)?);
         Ok(())
@@ -196,7 +197,7 @@ impl InvokeParams {
     pub fn arguments_spread<I, T>(&mut self, arguments: I) -> Result<()>
     where
         I: IntoIterator<Item = T>,
-        T: NativeValueIntoJs,
+        T: IntoJs,
     {
         self.arguments.extend(
             arguments.into_iter()
@@ -207,7 +208,7 @@ impl InvokeParams {
     }
 
     /// Converts the parameters into CDP call arguments.
-    pub fn into_arguments(self, expr_list: &mut Vec<(helper::JsonPointer, String)>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
+    pub fn into_arguments(self, this: Option<JsRemoteObject>, expr_list: &mut Vec<(helper::JsonPointer, String)>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
         let mut args = vec![];
 
         let mut descriptors = vec![];
@@ -230,7 +231,7 @@ impl InvokeParams {
             ..Default::default()
         });
         args.push(CallArgument{
-            object_id: self.this.map(|v| v.remote_id()),
+            object_id: this.map(|v| v.remote_id()),
             ..Default::default()
         });
 
