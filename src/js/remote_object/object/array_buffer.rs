@@ -3,6 +3,7 @@ use super::*;
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
     class ArrayBuffer extends Object {
+        static #type: "object";
         static #subtype: "arraybuffer";
 
         properties: {

@@ -40,6 +40,10 @@ macro_rules! js_remote_object {
             $(static #type: $type:expr;)?
             $(static #subtype: $subtype:expr;)?
             $(static #class: $class:expr;)?
+            $(
+                static #subtypes: [$($subtypes:expr),+];
+                static #classes: [$($classes:expr),+];
+            )?
 
             $(
                 properties: $properties:tt
@@ -114,12 +118,12 @@ macro_rules! js_remote_object {
             impl DerivedJs<[< Js $parent >]> for [< Js $t >] {
                 fn is_instance(value: &[< Js $parent >]) -> bool {
                     $(
-                        if value.remote_type().name() != $type {
+                        if !helper::TypePattern::matches($type, value.remote_object_type().name()) {
                             return false;
                         }
                     )?
                     $(
-                        let subtype = value.remote_type()
+                        let subtype = value.remote_object_type()
                             .object_subtype()
                             .map(|subtype| subtype.name());
                         if !helper::SubtypePattern::matches($subtype, subtype) {
@@ -127,8 +131,24 @@ macro_rules! js_remote_object {
                         }
                     )?
                     $(
-                        let class = value.remote_class();
+                        let class = value.remote_object_class();
                         if !helper::ClassPattern::matches($class, class) {
+                            return false;
+                        }
+                    )?
+                    $(
+                        let subtype = value.remote_object_type()
+                            .object_subtype()
+                            .map(|subtype| subtype.name());
+                        let class = value.remote_object_class();
+                        let mut matches = false;
+                        $(
+                            if helper::SubtypePattern::matches($subtypes, subtype) &&
+                                helper::ClassPattern::matches($classes, class) {
+                                matches = true;
+                            }
+                        )+
+                        if !matches {
                             return false;
                         }
                     )?
@@ -224,6 +244,9 @@ macro_rules! js_remote_object {
                     )?
                     $(
                         properties["subtype"] = helper::SubtypePattern::to_schema($subtype);
+                    )?
+                    $(
+                        properties["subtype"] = helper::SubtypePattern::to_schema([$($subtypes),+]);
                     )?
 
                     let remove_node_id = {
@@ -572,10 +595,10 @@ macro_rules! js_remote_object_methods {
     };
 
     (@argument $var:ident ... $arg:ident) => {
-        let $var = $var.arguments_spread($arg)?;
+        let $var = $var.arguments_spread($arg);
     };
     (@argument $var:ident $arg:ident) => {
-        let $var = $var.argument($arg)?;
+        let $var = $var.argument($arg);
     };
 }
 

@@ -3,6 +3,7 @@ use super::*;
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView
     class DataView extends Object {
+        static #type: "object";
         static #subtype: "dataview";
 
 

@@ -38,8 +38,10 @@ use crate::listeners::EventStream;
 use crate::utils::evaluation_string;
 use crate::handler::PageInner;
 use crate::page::Page;
-use crate::js::de::PageDeserializeSeed;
+use crate::js::de::JsDeserializeSeed;
 use crate::js::{FromJs, IntoJs, FromJsArgs, ScopedEvalParams, js_expr_str};
+
+use super::JsRemoteObjectCtx;
 
 /// Trait for functions that can be exposed to JavaScript.
 ///
@@ -323,7 +325,10 @@ impl<'f> Shared<'f> {
             self.adapter.arguments_schema()
         ).await.map_err(|e| e.to_string())?;
 
-        let result = self.adapter.invoke_from_javascript(self.page.clone(), args).await;
+        let result = self.adapter.invoke_from_javascript(
+            (self.page.clone(), execution_context_id).into(),
+            args
+        ).await;
         match result {
             Ok(result) => Ok(result),
             Err(e) => Err(e.to_string()),
@@ -356,10 +361,10 @@ async fn get_arguments(
     schema: Schema,
 ) -> Result<Vec<JsonValue>> {
     let params = ScopedEvalParams::new(GET_ARGUMENTS)
-        .expr_execution_context(execution_context_id);
+        .execution_context_id(execution_context_id);
 
-    let JsonValue::Array(args) = page.invoke_function(params)
-        .arguments((name, seq))?
+    let (JsonValue::Array(args), _) = page.invoke_function(params)
+        .arguments((name, seq))
         .invoke_with_schema(schema).await? else {
         return Err(CdpError::UnexpectedValue("args is not an array".to_string()));
     };
@@ -377,10 +382,10 @@ async fn set_result(
     errmsg: Option<String>
 ) -> Result<()> {
     let params = ScopedEvalParams::new(SET_RESULT)
-        .expr_execution_context(execution_context_id);
+        .execution_context_id(execution_context_id);
 
     page.invoke_function(params)
-        .arguments((name, seq, result, errmsg))?
+        .arguments((name, seq, result, errmsg))
         .invoke::<()>().await?;
     Ok(())
 }
@@ -395,7 +400,7 @@ struct CallbackPayload {
 /// Internal trait for type-erased callback adapters.
 #[async_trait::async_trait]
 trait ErasedFn: Send + Sync {
-    async fn invoke_from_javascript(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, String>;
+    async fn invoke_from_javascript(&self, ctx: JsRemoteObjectCtx, args: Vec<JsonValue>) -> Result<JsonValue, String>;
     fn arguments_schema(&self) -> Schema;
 }
 type BoxedErasedFn<'f> = Box<dyn ErasedFn + 'f>;
@@ -410,17 +415,15 @@ impl<'f, M, E, R, A> ErasedFn for BoxedFn<'f, M, E, R, A>
 where
     A: FromJsArgs,
 {
-    async fn invoke_from_javascript(&self, page: Arc<PageInner>, args: Vec<JsonValue>) -> Result<JsonValue, String> {
-        self.0.invoke_from_javascript(page.into(), args).await
+    async fn invoke_from_javascript(&self, ctx: JsRemoteObjectCtx, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+        let page = ctx.page().into();
+        let execution_context = ctx.execution_context_id();
+        self.0.invoke_from_javascript(page, execution_context, args).await
     }
     fn arguments_schema(&self) -> Schema {
         self.0.arguments_schema()
     }
 }
-
-/// Marker type for exposable async functions.
-#[derive(Debug, Clone, Copy)]
-pub struct ExposableFnAsyncMarker;
 
 macro_rules! impl_exposable_fn {
     (
@@ -429,19 +432,19 @@ macro_rules! impl_exposable_fn {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<'f, F, E, R, $($ty,)*> private::Sealed<(), E, R, ($($ty,)*)> for F
+            impl<'f, F, E, R, $($ty,)*> private::Sealed<private::ExposableFnMarker, E, R, ($($ty,)*)> for F
             where
                 F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync + 'f,
                 E: ExposableFnError + 'f,
                 R: IntoJs + 'f,
                 $( for<'a> $ty: FromJs + 'a,)*
             {
-                async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
-                    let page: Arc<PageInner> = page.into();
+                async fn invoke_from_javascript(&self, page: Page, execution_context: ExecutionContextId, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+                    let ctx = JsRemoteObjectCtx::new(page.into(), execution_context);
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageDeserializeSeed::new(page.clone(), PhantomData);
+                        let seed = JsDeserializeSeed::new(ctx.clone(), PhantomData);
                         let [< $ty:lower >] = seed.deserialize(json).map_err(|e| e.to_string())?;
                     )*
 
@@ -481,7 +484,7 @@ macro_rules! impl_exposable_fn_async {
         paste::paste!{
             #[allow(unused_variables, unused_mut)]
             #[async_trait::async_trait]
-            impl<'f, F, Fut, E, R, $($ty,)*> private::Sealed<ExposableFnAsyncMarker, E, R, ($($ty,)*)> for F
+            impl<'f, F, Fut, E, R, $($ty,)*> private::Sealed<private::ExposableFnAsyncMarker, E, R, ($($ty,)*)> for F
             where
                 F: (Fn($($ty,)*) -> Fut) + Send + Sync + 'f,
                 Fut: futures::Future<Output = Result<R, E>> + Send + 'f,
@@ -489,12 +492,12 @@ macro_rules! impl_exposable_fn_async {
                 R: IntoJs + 'f,
                 $( for<'a> $ty: FromJs + 'a,)*
             {
-                async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String> {
-                    let page: Arc<PageInner> = page.into();
+                async fn invoke_from_javascript(&self, page: Page, execution_context: ExecutionContextId, args: Vec<JsonValue>) -> Result<JsonValue, String> {
+                    let ctx = JsRemoteObjectCtx::new(page.into(), execution_context);
                     let mut _iter = args.into_iter();
                     $(
                         let json = _iter.next().unwrap_or_default();
-                        let seed = PageDeserializeSeed::new(page.clone(), PhantomData);
+                        let seed = JsDeserializeSeed::new(ctx.clone(), PhantomData);
                         let [< $ty:lower >] = seed.deserialize(json).map_err(|e| e.to_string())?;
                     )*
 
@@ -562,7 +565,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
         }
     );
     let descriptor: Option<PropertyDescriptor> = page.invoke_function(GET_BINDING_DESC)
-        .argument(binding_name)?
+        .argument(binding_name)
         .invoke().await?;
 
     let descriptor = if descriptor.is_none() || descriptor.as_ref().unwrap().value != "function" {
@@ -593,7 +596,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
         );
         // Make the cdp binding non-enumerable on the main frame
         page.invoke_function(SET_BINDING_ENUMERABLE)
-            .argument(binding_name)?
+            .argument(binding_name)
             .invoke::<()>().await?;
     }
     Ok(())
@@ -602,9 +605,17 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
 mod private {
     use super::*;
 
+    /// Marker type for exposable functions.
+    #[derive(Debug, Clone, Copy)]
+    pub enum ExposableFnMarker {}
+
+    /// Marker type for exposable async functions.
+    #[derive(Debug, Clone, Copy)]
+    pub enum ExposableFnAsyncMarker {}
+
     #[async_trait::async_trait]
     pub trait Sealed<M, E, R, A> {
-        async fn invoke_from_javascript(&self, page: Page, args: Vec<JsonValue>) -> Result<JsonValue, String>;
+        async fn invoke_from_javascript(&self, page: Page, execution_context: ExecutionContextId, args: Vec<JsonValue>) -> Result<JsonValue, String>;
         fn arguments_schema(&self) -> Schema;
     }
 }

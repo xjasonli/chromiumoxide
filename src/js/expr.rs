@@ -115,46 +115,6 @@ impl<'a, 'de> serde::Deserialize<'de> for JsExpr<'a> {
     }
 }
 
-
-/// The context for the expression
-/// 
-/// This enum provides three ways to identify and scope the execution context for the expression:
-/// - By the `this` value, which also identifies the execution context
-/// - By the execution context, identified by an object
-/// - By the execution context, identified by an ExecutionContextId or UniqueId
-#[derive(Debug, Clone)]
-pub enum JsExprContext {
-    /// The `this` value for the expression, also used as the execution context
-    This(JsRemoteObject),
-
-    /// The execution context for the expression, without this value
-    Context(ExecutionContext),
-
-    /// The execution context (identified by an object) for the expression, without this value
-    ContextObject(JsRemoteObject),
-}
-
-impl JsExprContext {
-    pub fn new_with_this<T: AsJs<JsRemoteObject>>(this: T) -> Self {
-        Self::This(this.as_js().clone())
-    }
-
-    pub fn new_with_context<T: Into<ExecutionContext>>(context: T) -> Self {
-        Self::Context(context.into())
-    }
-
-    pub fn new_with_context_object<T: AsJs<JsRemoteObject>>(context: T) -> Self {
-        Self::ContextObject(context.as_js().clone())
-    }
-}
-
-impl<T: Into<ExecutionContext>> From<T> for JsExprContext {
-    fn from(context: T) -> Self {
-        Self::Context(context.into())
-    }
-}
-
-
 // implement IntoJs<AnyType> for JsExpr<'a>
 impl<'a> IntoJs<str> for JsExpr<'a> {
     type FromJs = String;

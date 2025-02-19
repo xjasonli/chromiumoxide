@@ -414,7 +414,7 @@ impl PageInner {
         js::helper::eval_global(
             self.clone(),
             params.expr,
-            params.execution_context,
+            params.execution_context_id,
             params.options
         ).await
     }
@@ -427,7 +427,9 @@ impl PageInner {
         let evaluator = js::helper::Evaluator::new_expr(
             self.clone(),
             params.expr,
-            params.expr_context,
+            params.execution_context_id,
+            params.execution_context_object,
+            params.this,
             params.options
         );
         evaluator.eval().await
@@ -441,7 +443,9 @@ impl PageInner {
         let evaluator = js::helper::Evaluator::new_expr(
             self.clone(),
             params.expr,
-            params.expr_context,
+            params.execution_context_id,
+            params.execution_context_object,
+            params.this,
             params.options
         );
         evaluator.invoke()

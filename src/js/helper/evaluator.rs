@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallArgument, GetPropertiesParams, ReleaseObjectParams};
 use schemars::Schema;
 
@@ -14,31 +14,25 @@ pub(crate) struct Evaluator<'a> {
 }
 
 impl<'a> Evaluator<'a> {
-    pub fn new(
-        page: Arc<PageInner>,
-        target: EvalTarget<'a>,
-        options: EvalOptions,
-    ) -> Self {
-        Self { page, target, options }
-    }
-
-    pub fn new_remote(
+    pub fn new_object(
         page: Arc<PageInner>,
         object: impl AsJs<JsRemoteObject>,
         options: EvalOptions,
     ) -> Self {
-        Self::new(page, EvalTarget::Object(object.as_js().clone()), options)
+        let target = EvalTarget::new_with_object(object);
+        Self { page, target, options }
     }
 
     pub fn new_expr(
         page: Arc<PageInner>,
         expr: impl Into<JsExpr<'a>>,
-        expr_context: Option<JsExprContext>,
+        execution_context_id: Option<ExecutionContextId>,
+        execution_context_object: Option<BoxedIntoJs<'a>>,
+        this: Option<BoxedIntoJs<'a>>,
         options: EvalOptions,
     ) -> Self {
-        Self::new(page, EvalTarget::Expr(
-            ExprTarget::new(expr.into(), expr_context)
-        ), options)
+        let target = EvalTarget::new(expr.into(), execution_context_id, execution_context_object, this);
+        Self { page, target, options }
     }
 
     pub async fn eval<T>(self) -> Result<T>
@@ -50,22 +44,28 @@ impl<'a> Evaluator<'a> {
             settings.inline_subschemas = true;
             settings.into_generator().into_root_schema_for::<T>()
         };
+        let page = self.page.clone();
+        let (value, execution_context_id) = self.eval_with_schema(schema).await?;
 
         let value = serde::de::DeserializeSeed::deserialize(
-            de::PageDeserializeSeed::new(self.page.clone(), PhantomData),
-            self.eval_with_schema(schema).await?
+            de::JsDeserializeSeed::new(
+                JsRemoteObjectCtx::new(page, execution_context_id),
+                PhantomData,
+            ),
+            value
         )?;
         Ok(value)
     }
 
-    pub async fn eval_with_schema(self, schema: Schema) -> Result<JsonValue> {
-        let params = self.target.into_params(
+    pub async fn eval_with_schema(self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
+        let (params, execution_context_id) = self.target.into_params(
             self.page.clone(),
             None,
             schema,
             self.options
         ).await?;
-        execute(self.page, params).await
+        let value = execute(self.page, params).await?;
+        Ok((value, execution_context_id))
     }
 
     pub fn invoke(self) -> FunctionInvoker<'a> {
@@ -73,249 +73,186 @@ impl<'a> Evaluator<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum EvalTarget<'a> {
-    Object(JsRemoteObject),
-    Expr(ExprTarget<'a>),
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ExprTarget<'a> {
+#[derive(Debug)]
+pub(crate) struct EvalTarget<'a> {
     // the expression to be evaluated
     pub(crate) expr: JsExpr<'a>,
 
     // the execution context for the expression
-    pub(crate) context: Option<JsExprContext>,
-}
+    pub(crate) execution_context_id: Option<ExecutionContextId>,
 
-impl<'a> ExprTarget<'a> {
-    pub fn new(
-        expr: JsExpr<'a>,
-        context: Option<JsExprContext>,
-    ) -> Self {
-        Self { expr, context }
-    }
-}
+    // the execution context (identified by a remote object) for the expression
+    pub(crate) execution_context_object: Option<BoxedIntoJs<'a>>,
 
-const EVALUATOR: &'static str = include_str!("evaluator.js");
-fn generate_function(expr_func: &str, expr_list: &[(JsonPointer, String)]) -> String {
-    let expr_list = expr_list.into_iter()
-        .map(|(path, expr)| {
-            let path_json = serde_json::to_string(path).unwrap();
-            format!(
-                "{{ path: {}, value: (()=>({}))() }}",
-                path_json,
-                expr
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(",");
-    EVALUATOR.replace(
-        "__EXPR_FUNC__",
-        expr_func
-    ).replace(
-        "__EXPR_LIST__",
-        &expr_list
-    )
+    // the this value for the expression
+    pub(crate) this: Option<BoxedIntoJs<'a>>,
 }
 
 impl<'a> EvalTarget<'a> {
+    pub fn new_with_object(
+        object: impl AsJs<JsRemoteObject>,
+    ) -> Self {
+        let object = object.as_js().clone();
+        Self {
+            expr: "this".into(),
+            execution_context_id: Some(object.execution_context_id()),
+            execution_context_object: None,
+            this: Some(Box::new(object)),
+        }
+    }
+
+    pub fn new(
+        expr: JsExpr<'a>,
+        execution_context_id: Option<ExecutionContextId>,
+        execution_context_object: Option<BoxedIntoJs<'a>>,
+        this: Option<BoxedIntoJs<'a>>,
+    ) -> Self {
+        Self { expr, execution_context_id, execution_context_object, this }
+    }
+
     pub(crate) async fn into_params(
-        self,
+        mut self,
         page: Arc<PageInner>,
-        invoke: Option<(Option<JsRemoteObject>, InvokeParams)>,
+        invoke: Option<InvokeParams<'a>>,
         schema: Schema,
         options: EvalOptions
-    ) -> Result<CallFunctionOnParams> {
-        let raw_params = match self {
-            EvalTarget::Object(remote) => {
-                let mut remotes = vec![remote.clone()];
-                let mut expr_list = vec![];
+    ) -> Result<(CallFunctionOnParams, ExecutionContextId)> {
+        let mut objects = vec![];
+        let mut call_arguments = vec![];
 
-                let (func_args, expr_func) = if let Some((this, params)) = invoke {
-                    let func_args = params.into_arguments(this, &mut expr_list, &mut remotes)?;
-                    let expr_func = "this".into();
-                    (func_args, expr_func)
-                } else {
-                    let func_args = InvokeParams::default().into_arguments(None, &mut expr_list, &mut remotes)?;
-                    let expr_func = "() => this".into();
-                    (func_args, expr_func)
-                };
-                let expr_this = CallArgument::builder()
-                    .object_id(remote.remote_id())
-                    .build();
-                let context = remote.into();
-
-                RawParams {
-                    expr_func,
-                    expr_list,
-                    expr_this,
-                    func_args,
-                    context,
-                    remotes,
-                }
-            }
-            EvalTarget::Expr(expr_target) => {
-                let mut remotes = vec![];
-                let mut expr_list = vec![];
-                match &expr_target.context {
-                    Some(JsExprContext::This(remote)) => {
-                        remotes.push(remote.clone());
-                    }
-                    Some(JsExprContext::ContextObject(remote)) => {
-                        remotes.push(remote.clone());
-                    }
-                    _ => (),
-                }
-
-                let (func_args, expr_func) = {
-                    if let Some((this, params)) = invoke {
-                        let func_args = params.into_arguments(this, &mut expr_list, &mut remotes)?;
-                        let expr_func = expr_target.expr.into_inner();
-                        (func_args, expr_func)
-                    } else {
-                        let func_args = InvokeParams::default().into_arguments(None, &mut expr_list, &mut remotes)?;
-                        let expr_func = format!("()=>({})", expr_target.expr.into_inner()).into();
-                        (func_args, expr_func)
-                    }
-                };
-                let expr_this = expr_target.context.as_ref().map(|context| {
-                    match context {
-                        JsExprContext::This(remote) => {
-                            CallArgument::builder()
-                                .object_id(remote.remote_id())
-                                .build()
-                        }
-                        _ => Default::default(),
-                    }
-                }).unwrap_or_default();
-                let context = expr_target.context.into();
-                RawParams {
-                    expr_func,
-                    expr_list,
-                    expr_this,
-                    func_args,
-                    context,
-                    remotes,
-                }
-            }
-        };
-        raw_params.into_params(page, schema, options).await
-    }
-}
-
-enum EvalExecutionContext {
-    None,
-    Context(ExecutionContext),
-    ContextObject(JsRemoteObject),
-}
-
-impl EvalExecutionContext {
-    fn apply(self, mut params: CallFunctionOnParams) -> CallFunctionOnParams {
-        match self {
-            Self::None => params,
-            Self::Context(ExecutionContext::Id(id)) => {
-                params.execution_context_id = Some(id);
-                params
-            }
-            Self::Context(ExecutionContext::UniqueId(unique_id)) => {
-                params.unique_context_id = Some(unique_id);
-                params
-            }
-            Self::ContextObject(remote) => {
-                params.object_id = Some(remote.remote_id());
-                params
-            }
-        }
-    }
-
-    fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-}
-
-impl From<JsRemoteObject> for EvalExecutionContext {
-    fn from(remote: JsRemoteObject) -> Self {
-        Self::ContextObject(remote)
-    }
-}
-
-impl From<JsExprContext> for EvalExecutionContext {
-    fn from(context: JsExprContext) -> Self {
-        match context {
-            JsExprContext::This(remote) | JsExprContext::ContextObject(remote) => {
-                Self::from(remote)
-            }
-            JsExprContext::Context(context) => {
-                Self::Context(context)
-            }
-        }
-    }
-}
-impl From<Option<JsExprContext>> for EvalExecutionContext {
-    fn from(context: Option<JsExprContext>) -> Self {
-        match context {
-            Some(context) => context.into(),
-            None => Self::None,
-        }
-    }
-}
-
-struct RawParams<'a> {
-    expr_func: Cow<'a, str>,
-    expr_list: Vec<(JsonPointer, String)>,
-    expr_this: CallArgument,
-    func_args: Vec<CallArgument>,
-    context: EvalExecutionContext,
-    remotes: Vec<JsRemoteObject>,
-}
-
-impl<'a> RawParams<'a> {
-    async fn into_params(
-        self,
-        page: Arc<PageInner>,
-        schema: Schema,
-        options: EvalOptions,
-    ) -> Result<CallFunctionOnParams> {
-        let context = {
-            if self.context.is_none() {
-                if let Some(remote_object) = self.remotes.first() {
-                    EvalExecutionContext::ContextObject(remote_object.clone())
-                } else {
-                    let context_id = page.execution_context().await?
-                        .ok_or_else(|| CdpError::msg("No execution context found"))?;
-                    EvalExecutionContext::Context(context_id.into())
-                }
+        // extracts the execution context id from the execution context object
+        if let Some(execution_context_object) = self.execution_context_object {
+            let object = Argument::new(execution_context_object)?;
+            if let Some(execution_context_id) = object.execution_context_id {
+                self.execution_context_id.get_or_insert(execution_context_id);
             } else {
-                self.context
+                // Should we return an error here?
+            }
+        }
+
+        let this_exprs = {
+            let this = Argument::new(self.this)?;
+            call_arguments.push(CallArgument::builder()
+                .value(serde_json::to_value(schema)?)
+                .build()
+            );
+            call_arguments.push(CallArgument::builder()
+                .value(serde_json::to_value(options.await_promise)?)
+                .build()
+            );
+            call_arguments.push(CallArgument::builder()
+                .value(serde_json::to_value(this.descriptor)?)
+                .build()
+            );
+            this.specials.into_iter().for_each(|special| {
+                if let Some(id) = special.remote_object_id() {
+                    objects.push(id);
+                }
+                call_arguments.push(special.into_call_argument());
+            });
+            if let Some(execution_context_id) = this.execution_context_id {
+                self.execution_context_id.get_or_insert(execution_context_id);
+            }
+            this.exprs
+        };
+
+        let args_exprs = {
+            if let Some(invoke) = invoke {
+                let args = Argument::new(invoke)?;
+                call_arguments.push(CallArgument::builder()
+                    .value(serde_json::to_value(args.descriptor)?)
+                    .build()
+                );
+                args.specials.into_iter().for_each(|special| {
+                    if let Some(id) = special.remote_object_id() {
+                        objects.push(id);
+                    }
+                    call_arguments.push(special.into_call_argument());
+                });
+                if let Some(execution_context_id) = args.execution_context_id {
+                    self.execution_context_id.get_or_insert(execution_context_id);
+                }
+                args.exprs
+            } else {
+                Vec::new()
             }
         };
+
+        let execution_context_id = if let Some(execution_context_id) = self.execution_context_id {
+            execution_context_id
+        } else {
+            page.execution_context().await?
+                .ok_or(CdpError::msg("No execution context found"))?
+        };
+
+        let function = generate_function(&this_exprs, self.expr.as_str(), &args_exprs);
 
         let params = CallFunctionOnParams::builder()
-            .function_declaration(
-                generate_function(
-                    &self.expr_func,
-                    &self.expr_list
-                )
-            )
-            .return_by_value(false)
-            .arguments(self.func_args)
-            .argument(self.expr_this)
-            .argument(
-                CallArgument::builder()
-                    .value(serde_json::to_value(options.await_promise)?)
-                    .build()
-            )
-            .argument(
-                CallArgument::builder()
-                    .value(serde_json::to_value(schema)?)
-                    .build()
-            )
+            .function_declaration(function)
+            .execution_context_id(execution_context_id)
             .await_promise(options.await_promise)
             .user_gesture(options.user_gesture)
+            .return_by_value(false)
+            .arguments(call_arguments)
             .build()
-            .unwrap();
-        Ok(context.apply(params))
+            .expect("build CallFunctionOnParams should be infallible");
+
+        Ok((params, execution_context_id))
+    }
+}
+
+
+const EVALUATOR: &'static str = include_str!("evaluator.js");
+fn generate_function(
+    this_exprs: &[(JsonPointer, String)],
+    expr: &str,
+    args_exprs: &[(JsonPointer, String)],
+) -> String {
+    fn expr_to_code(path: &JsonPointer, expr: &str) -> String {
+        let path_json = serde_json::to_string(path)
+            .expect("string serializing is infallible");
+        format!(
+            "{{ path: {}, value: (()=>({}))() }}",
+            path_json,
+            expr
+        )
+    }
+    let this_exprs = this_exprs.into_iter()
+        .map(|(path, expr)| expr_to_code(path, expr))
+        .collect::<Vec<_>>()
+        .join(",");
+    let args_exprs = args_exprs.into_iter()
+        .map(|(path, expr)| expr_to_code(path, expr))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    EVALUATOR.replace("__THIS_EXPRS__", &this_exprs)
+        .replace("__EXPR__", expr)
+        .replace("__ARGS_EXPRS__", &args_exprs)
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Argument {
+    pub descriptor: ValueDescriptor,
+    pub specials: Vec<SpecialValue>,
+    pub exprs: Vec<(JsonPointer, String)>,
+    pub execution_context_id: Option<ExecutionContextId>,
+}
+
+impl Argument {
+    pub fn new<T: IntoJs>(value: T) -> Result<Self> {
+        let ctx = ser::JsSerializerCtx::default();
+        let serializer = ser::JsJsonSerializer::new_json_serializer(ctx.clone());
+        let mut exprs = vec![];
+        let (descriptor, specials) = ValueDescriptor::parse_with_expr(
+            value.serialize(serializer)?,
+            &mut exprs,
+            &[],
+        );
+        let execution_context_id = ctx.borrow()
+            .first()
+            .map(|object| object.execution_context_id());
+        Ok(Self { descriptor, specials, exprs, execution_context_id })
     }
 }
 
@@ -411,7 +348,7 @@ pub(crate) async fn execute(page: Arc<PageInner>, params: CallFunctionOnParams) 
                 return Err(CdpError::UnexpectedValue(format!("Invalid properties: {:#?}", properties)));
             };
             let special = SpecialValue::from_remote_object(&page, remote_object).await?;
-            if let Some(id) = special.remote_id() {
+            if let Some(id) = special.remote_object_id() {
                 items_guard.add(id.clone());
             }
             specials.push(special);

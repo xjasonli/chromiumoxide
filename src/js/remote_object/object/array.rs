@@ -15,6 +15,7 @@ pub use node_list::*;
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Indexed_collections#working_with_array-like_objects
     class ArrayLike extends Object {
+        static #type: "object";
         static #subtype: "array";
 
         properties: {

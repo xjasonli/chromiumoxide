@@ -3,6 +3,7 @@ use super::*;
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
     class Promise extends Object {
+        static #type: "object";
         static #subtype: "promise";
 
         methods: {
@@ -21,8 +22,8 @@ js_remote_object!(
 impl JsPromise {
     pub fn into_future<T: FromJs>(self) -> impl futures::Future<Output = Result<T>> + Send
     {
-        let evaluator = helper::Evaluator::new_remote(
-            self.page(),
+        let evaluator = helper::Evaluator::new_object(
+            self.ctx().page(),
             self.clone(),
             EvalOptions {
                 await_promise: true,

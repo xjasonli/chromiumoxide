@@ -5,7 +5,7 @@
 use std::{ops::Deref, sync::Arc};
 use serde::de::Error as _;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{ReleaseObjectParams, RemoteObjectId};
-use crate::{error::Result, handler::PageInner, js::de::PageDeserializer};
+use crate::{error::Result, handler::PageInner, js::de::JsDeserializer, Page};
 use super::*;
 
 mod macros;
@@ -57,14 +57,24 @@ pub struct JsRemoteObject(Arc<JsRemoteObjectInner>);
 /// - Type checking and downcasting
 /// - JavaScript evaluation and function invocation
 impl JsRemoteObject {
+    /// Returns the page associated with this remote object.
+    pub fn page(&self) -> Page {
+        self.0.ctx.page.clone().into()
+    }
+
+    /// Returns the execution context associated with this remote object.
+    pub fn execution_context_id(&self) -> ExecutionContextId {
+        self.0.ctx.execution_context_id
+    }
+
     /// Returns the unique identifier of this remote object.
-    pub fn remote_id(&self) -> RemoteObjectId {
-        self.0.data.id.clone()
+    pub fn remote_object_id(&self) -> RemoteObjectId {
+        self.0.val.id.clone()
     }
 
     /// Returns the JavaScript type of this remote object.
-    pub fn remote_type(&self) -> &JsRemoteObjectType {
-        &self.0.data.r#type
+    pub fn remote_object_type(&self) -> &JsRemoteObjectType {
+        &self.0.val.r#type
     }
 
     /// Returns the JavaScript class name of this remote object.
@@ -83,8 +93,8 @@ impl JsRemoteObject {
     /// }
     /// # }
     /// ```
-    pub fn remote_class(&self) -> &str {
-        &self.0.data.class
+    pub fn remote_object_class(&self) -> &str {
+        &self.0.val.class
     }
 
     /// Checks if this object is an instance of the specified type.
@@ -127,6 +137,10 @@ impl JsRemoteObject {
         T::downcast_from(self.clone())
     }
 
+    pub fn downcast_unchecked<T: DerivedJs<Self>>(&self) -> T::FromJs {
+        T::downcast_from_unchecked(self.clone())
+    }
+
     /// Evaluates a JavaScript expression in the context of this object.
     /// 
     /// This method executes JavaScript code with `this` bound to the current object.
@@ -148,12 +162,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn eval<'a, T: FromJs>(
-        &self,
-        params: impl Into<EvalParams<'a>>,
-    ) -> Result<T> {
-        let params = params.into().into_scoped().expr_this(self);
-        self.page().eval(params).await
+    pub async fn eval<'a, T: FromJs>(&self, params: impl Into<EvalParams<'a>>) -> Result<T> {
+        let params: ScopedEvalParams<'a> = params.into().into_scoped().this(self.clone());
+        self.ctx().page().eval(params).await
     }
 
     /// Creates a function invoker for executing JavaScript functions with this object as `this`.
@@ -181,31 +192,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_function<'a>(&self, function: impl Into<JsExpr<'a>>) -> FunctionInvoker<'a> {
-        self.invoke_function_with_options(function, EvalOptions::default())
-    }
-
-    /// Invokes a function on this object with the given evaluation options.
-    /// 
-    /// This method allows executing JavaScript functions in the context of the current object.
-    /// The function can be specified either as a `JsFunction` object or as a string expression.
-    /// 
-    /// # Arguments
-    /// * `function` - The function to invoke, either as a `JsFunction` or string expression
-    /// * `options` - Evaluation options like timeout and execution context
-    /// 
-    /// # Returns
-    /// A `FunctionInvoker` that can be used to add arguments and execute the function
-    pub fn invoke_function_with_options<'a>(
-        &self,
-        function: impl Into<JsExpr<'a>>,
-        options: EvalOptions,
-    ) -> FunctionInvoker<'a> {
-        let params = ScopedEvalParams::new(function)
-            .expr_this(self.clone())
-            .options(options);
-        self.page().invoke_function(params)
-            .this(self.clone())
+    pub fn invoke_function<'a>(&self, params: impl Into<EvalParams<'a>>) -> FunctionInvoker<'a> {
+        let params: ScopedEvalParams<'a> = params.into().into_scoped().this(self.clone());
+        self.ctx().page().invoke_function(params).this(self.clone())
     }
 
     /// Invokes a method on this object.
@@ -232,26 +221,10 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_method(&self, name: impl IntoJs) -> FunctionInvoker<'static> {
-        self.invoke_method_with_options(name, EvalOptions::default())
-    }
-
-    /// Invokes a method on this object with the given evaluation options.
-    /// 
-    /// This method allows executing JavaScript methods in the context of the current object.
-    /// The method can be specified either as a string expression or as a `JsFunction` object.
-    /// 
-    /// # Arguments
-    /// * `name` - The name of the method to invoke
-    /// * `options` - Evaluation options like timeout and execution context
-    /// 
-    /// # Returns
-    /// A `FunctionInvoker` that can be used to add arguments and execute the method
-    pub fn invoke_method_with_options(&self, name: impl IntoJs, options: EvalOptions) -> FunctionInvoker<'static> {
+    pub fn invoke_method<'a>(&self, name: impl IntoJs + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (name, ...args) => this[name](...args) ];
-        self.invoke_function_with_options(FUNCTION, options)
+        self.invoke_function(FUNCTION)
             .argument(name)
-            .expect("string serializing is infallible")
     }
 
     /// Invokes a well-known Symbol method on this object.
@@ -270,26 +243,10 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_well_known_symbol_method(&self, symbol: impl IntoJs<str>) -> FunctionInvoker<'static> {
-        self.invoke_well_known_symbol_method_with_options(symbol, EvalOptions::default())
-    }
-
-    /// Invokes a Symbol method on this object with the given evaluation options.
-    /// 
-    /// This method executes a method referenced by a well-known Symbol (like `Symbol.iterator`).
-    /// The method is called with `this` bound to the current object.
-    /// 
-    /// # Arguments
-    /// * `symbol` - The well-known Symbol to invoke
-    /// * `options` - Evaluation options like timeout and execution context
-    /// 
-    /// # Returns
-    /// A `FunctionInvoker` that can be used to add arguments and execute the method
-    pub fn invoke_well_known_symbol_method_with_options(&self, symbol: impl IntoJs<str>, options: EvalOptions) -> FunctionInvoker<'static> {
+    pub fn invoke_well_known_symbol_method<'a>(&self, symbol: impl IntoJs<str> + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol[symbol]](...args) ];
-        self.invoke_function_with_options(FUNCTION, options)
+        self.invoke_function(FUNCTION)
             .argument(symbol)
-            .expect("string serializing is infallible")
     }
 
     /// Invokes a Symbol method registered with `Symbol.for()` on this object.
@@ -308,26 +265,10 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_symbol_method_for(&self, symbol: impl IntoJs<str>) -> FunctionInvoker<'static> {
-        self.invoke_symbol_method_for_with_options(symbol, EvalOptions::default())
-    }
-
-    /// Invokes a Symbol method registered with `Symbol.for()` on this object with the given evaluation options.
-    /// 
-    /// This method executes a method referenced by a Symbol registered in the global Symbol registry.
-    /// The method is called with `this` bound to the current object.
-    /// 
-    /// # Arguments
-    /// * `symbol` - The Symbol to invoke
-    /// * `options` - Evaluation options like timeout and execution context
-    /// 
-    /// # Returns
-    /// A `FunctionInvoker` that can be used to add arguments and execute the method
-    pub fn invoke_symbol_method_for_with_options(&self, symbol: impl IntoJs<str>, options: EvalOptions) -> FunctionInvoker<'static> {
+    pub fn invoke_symbol_method_for<'a>(&self, symbol: impl IntoJs<str> + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol.for(symbol)](...args) ];
-        self.invoke_function_with_options(FUNCTION, options)
+        self.invoke_function(FUNCTION)
             .argument(symbol)
-            .expect("string serializing is infallible")
     }
 
     /// Gets a property value from this object.
@@ -369,7 +310,7 @@ impl JsRemoteObject {
     {
         const FUNCTION: JsExpr<'static> = js_expr![(name) => this[name]];
         self.invoke_function(FUNCTION)
-            .argument(name)?
+            .argument(name)
             .invoke::<T>().await
     }
 
@@ -393,7 +334,7 @@ impl JsRemoteObject {
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol) => this[Symbol[symbol]] ];
         self.invoke_function(FUNCTION)
-            .argument(symbol)?
+            .argument(symbol)
             .invoke::<T>().await
     }
 
@@ -417,7 +358,7 @@ impl JsRemoteObject {
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (name) => this[Symbol.for(name)] ];
         self.invoke_function(FUNCTION)
-            .argument(symbol)?
+            .argument(symbol)
             .invoke::<T>().await
     }
 
@@ -442,10 +383,10 @@ impl JsRemoteObject {
     where
         T: IntoJs,
     {
-        const FUNCTION: JsExpr<'static> = js_expr![ (name, value) => this[name] = value ];
+        const FUNCTION: JsExpr<'static> = js_expr![ (name, value) => { this[name] = value; } ];
         self.invoke_function(FUNCTION)
-            .argument(name)?
-            .argument(value)?
+            .argument(name)
+            .argument(value)
             .invoke().await
     }
 
@@ -467,10 +408,10 @@ impl JsRemoteObject {
     where
         T: IntoJs,
     {
-        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => this[Symbol[symbol]] = value ];
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => { this[Symbol[symbol]] = value; } ];
         self.invoke_function(FUNCTION)
-            .argument(symbol)?
-            .argument(value)?
+            .argument(symbol)
+            .argument(value)
             .invoke().await
     }
 
@@ -492,38 +433,46 @@ impl JsRemoteObject {
     where
         T: IntoJs,
     {
-        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => this[Symbol.for(symbol)] = value ];
+        const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => { this[Symbol.for(symbol)] = value; } ];
         self.invoke_function(FUNCTION)
-            .argument(symbol)?
-            .argument(value)?
+            .argument(symbol)
+            .argument(value)
             .invoke().await
     }
 }
 
 impl JsRemoteObject {
-    pub(crate) fn new(page: Arc<PageInner>, data: helper::JsRemote) -> Self {
-        Self(Arc::new(JsRemoteObjectInner { page, data }))
+    pub(crate) fn new(ctx: JsRemoteObjectCtx, data: helper::JsRemoteVal) -> Self {
+        Self(Arc::new(JsRemoteObjectInner { ctx, val: data }))
     }
 
-    pub(crate) fn page(&self) -> Arc<PageInner> {
-        self.0.page.clone()
+    pub(crate) fn ctx(&self) -> JsRemoteObjectCtx {
+        self.0.ctx.clone()
+    }
+
+    pub(crate) fn val(&self) -> &helper::JsRemoteVal {
+        &self.0.val
     }
 }
 
 impl From<JsRemoteObject> for RemoteObjectId {
     fn from(value: JsRemoteObject) -> Self {
-        value.remote_id()
+        value.remote_object_id()
     }
 }
 
 impl From<&JsRemoteObject> for RemoteObjectId {
     fn from(value: &JsRemoteObject) -> Self {
-        value.remote_id()
+        value.remote_object_id()
     }
 }
 
 impl serde::Serialize for JsRemoteObject {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if let Some(spec) = try_specialize::Specialization::<S, ser::JsJsonSerializer>::try_new() {
+            spec.specialize_ref(&serializer).add(self);
+        }
+
         self.0.serialize(serializer)
     }
 }
@@ -562,30 +511,56 @@ impl AsJs<JsRemoteObject> for JsRemoteObject {
 }
 
 
+#[derive(Debug, Clone)]
+pub(crate) struct JsRemoteObjectCtx {
+    pub(crate) page: Arc<PageInner>,
+    pub(crate) execution_context_id: ExecutionContextId,
+}
+
+impl JsRemoteObjectCtx {
+    pub(crate) fn new(page: Arc<PageInner>, execution_context_id: ExecutionContextId) -> Self {
+        Self { page, execution_context_id }
+    }
+
+    pub(crate) fn page(&self) -> Arc<PageInner> {
+        self.page.clone()
+    }
+
+    pub(crate) fn execution_context_id(&self) -> ExecutionContextId {
+        self.execution_context_id
+    }
+}
+
+impl From<(Arc<PageInner>, ExecutionContextId)> for JsRemoteObjectCtx {
+    fn from(value: (Arc<PageInner>, ExecutionContextId)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}
+
+impl PartialEq for JsRemoteObjectCtx {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.page, &other.page)
+            && self.execution_context_id == other.execution_context_id
+    }
+}
+impl Eq for JsRemoteObjectCtx {}
+
 /// Internal storage for JsRemoteObject.
 /// 
 /// Contains the page reference and remote object data needed to interact with
 /// the JavaScript object in the browser.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct JsRemoteObjectInner {
-    pub(crate) page: Arc<PageInner>,
-    pub(crate) data: helper::JsRemote,
+    pub(crate) ctx: JsRemoteObjectCtx,
+    pub(crate) val: helper::JsRemoteVal,
 }
-
-impl PartialEq for JsRemoteObjectInner {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.page, &other.page)
-            && self.data == other.data
-    }
-}
-impl Eq for JsRemoteObjectInner {}
 
 /// Automatically releases the remote object when it is dropped.
 impl Drop for JsRemoteObjectInner {
     fn drop(&mut self) {
-        let _ = self.page.execute_no_wait(
+        let _ = self.ctx.page.execute_no_wait(
             ReleaseObjectParams::builder()
-                .object_id(self.data.id.clone())
+                .object_id(self.val.id.clone())
                 .build().unwrap()
         );
     }
@@ -593,15 +568,15 @@ impl Drop for JsRemoteObjectInner {
 
 impl serde::Serialize for JsRemoteObjectInner {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.data.serialize(serializer)
+        self.val.serialize(serializer)
     }
 }
 
 impl<'de> serde::Deserialize<'de> for JsRemoteObjectInner {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(JsRemoteObjectInner {
-            page: PageDeserializer::try_get(&deserializer)?,
-            data: helper::JsRemote::deserialize(deserializer)?,
+            ctx: JsDeserializer::try_get(&deserializer)?,
+            val: helper::JsRemoteVal::deserialize(deserializer)?,
         })
     }
 }
@@ -618,7 +593,7 @@ impl schemars::JsonSchema for JsRemoteObjectInner {
         ))
     }
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        generator.subschema_for::<helper::JsRemote>()
+        generator.subschema_for::<helper::JsRemoteVal>()
     }
 }
 
@@ -834,3 +809,4 @@ impl JsObjectSubtype {
 }
 
 
+unsafe impl try_specialize::LifetimeFree for JsRemoteObject {}

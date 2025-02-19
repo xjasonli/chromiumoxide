@@ -1,5 +1,39 @@
 use std::fmt::Debug;
 
+/// A pattern that matches a type name.
+pub trait TypePattern: Sized + Copy + Debug {
+    fn matches(self, r#type: &str) -> bool;
+}
+
+impl<'a> TypePattern for &'a str {
+    fn matches(self, r#type: &str) -> bool {
+        self == r#type
+    }
+}
+
+impl<'a, const N: usize> TypePattern for [&'a str; N] {
+    fn matches(self, r#type: &str) -> bool {
+        for pattern in self.into_iter() {
+            if TypePattern::matches(pattern, r#type) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl<'a, 'b> TypePattern for &'a [&'b str] {
+    fn matches(self, r#type: &str) -> bool {
+        for &pattern in self.into_iter() {
+            if TypePattern::matches(pattern, r#type) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+/// A pattern that matches a class name.
 pub trait ClassPattern: Sized + Copy + Debug {
     fn matches(self, class: &str) -> bool;
 }
@@ -28,6 +62,7 @@ impl<'a, 'b> ClassPattern for &'a [&'b str] {
     }
 }
 
+/// A pattern that matches a subtype name.
 pub trait SubtypePattern: Sized + Copy + Debug {
     fn matches(self, subtype: Option<&str>) -> bool;
     fn to_schema(self) -> serde_json::Value;

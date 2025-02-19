@@ -1,72 +1,70 @@
-use std::sync::Arc;
 use serde::de::Error;
+use super::JsRemoteObjectCtx;
 
-use crate::handler::PageInner;
-
-pub(crate) struct PageDeserializeSeed<T> {
+pub(crate) struct JsDeserializeSeed<T> {
     inner: T,
-    page: Arc<PageInner>,
+    ctx: JsRemoteObjectCtx,
 }
 
-impl<T> PageDeserializeSeed<T> {
-    pub(crate) fn new(page: Arc<PageInner>, inner: T) -> Self {
-        Self { inner, page }
+impl<T> JsDeserializeSeed<T> {
+    pub(crate) fn new(ctx: JsRemoteObjectCtx, inner: T) -> Self {
+        Self { inner, ctx }
     }
 }
 
-impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for PageDeserializeSeed<T> {
+impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for JsDeserializeSeed<T> {
     type Value = T::Value;
 
     fn deserialize<D: serde::de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        let deserializer = PageDeserializer::new(deserializer, self.page.clone());
+        let deserializer = JsDeserializer::new(deserializer, self.ctx.clone());
 
         self.inner.deserialize(deserializer)
             .map_err(|e| D::Error::custom(e.to_string()))
     }
 }
 
-pub(crate) struct PageDeserializer<'de, 'a> {
+pub(crate) struct JsDeserializer<'de, 'a> {
     inner: Box<dyn erased_serde::Deserializer<'de> + 'a>,
-    page: Arc<PageInner>,
+    ctx: JsRemoteObjectCtx,
 }
 
-impl<'de, 'a> PageDeserializer<'de, 'a> {
+impl<'de, 'a> JsDeserializer<'de, 'a> {
     pub fn get<D: serde::de::Deserializer<'de> + 'a>(
         deserializer: &D,
-    ) -> Option<Arc<PageInner>> {
+    ) -> Option<JsRemoteObjectCtx> {
         Self::try_get(deserializer)
             .ok()
     }
 
     pub fn try_get<D: serde::de::Deserializer<'de> + 'a>(
         deserializer: &D,
-    ) -> Result<Arc<PageInner>, D::Error> {
+    ) -> Result<JsRemoteObjectCtx, D::Error> {
         use try_specialize::TrySpecialize as _;
 
         let this = unsafe {
             deserializer.try_specialize_ref_ignore_lifetimes::<Self>()
                 .ok_or_else(|| D::Error::custom(
-                    "Deserializer is not a `PageDeserializer`"
+                    "Deserializer is not a `JsDeserializer`"
                 ))?
         };
-        Ok(this.page())
+        Ok(this.ctx())
     }
 
     pub fn new<T: serde::de::Deserializer<'de> + 'a>(
         inner: T,
-        page: Arc<PageInner>,
+        ctx: JsRemoteObjectCtx,
     ) -> Self
     where 'de: 'a
     {
         let inner = Box::new(<dyn erased_serde::Deserializer<'de>>::erase(inner));
         Self {
             inner,
-            page,
+            ctx,
         }
     }
 
-    pub fn page(&self) -> Arc<PageInner> {
-        self.page.clone()
+    pub fn ctx(&self) -> JsRemoteObjectCtx {
+        self.ctx.clone()
     }
 }
 
@@ -78,9 +76,9 @@ macro_rules! impl_deserialize_method {
                     $(
                         $($name,)*
                     )?
-                    PageVisitor {
+                    JsVisitor {
                         inner: visitor,
-                        page: self.page,
+                        ctx: self.ctx,
                     }
                 )
             }
@@ -88,7 +86,7 @@ macro_rules! impl_deserialize_method {
     };
 }
 
-impl<'de, 'a> serde::de::Deserializer<'de> for PageDeserializer<'de, 'a> {
+impl<'de, 'a> serde::de::Deserializer<'de> for JsDeserializer<'de, 'a> {
     type Error = erased_serde::Error;
 
     impl_deserialize_method!(any);
@@ -124,9 +122,9 @@ impl<'de, 'a> serde::de::Deserializer<'de> for PageDeserializer<'de, 'a> {
     impl_deserialize_method!(ignored_any);
 }
 
-struct PageVisitor<V> {
+struct JsVisitor<V> {
     inner: V,
-    page: Arc<PageInner>,
+    ctx: JsRemoteObjectCtx,
 }
 
 macro_rules! impl_visit_method {
@@ -151,7 +149,7 @@ macro_rules! impl_visit_method {
                 )?
                 let $name = $type2 {
                     inner: $name,
-                    page: self.page.clone(),
+                    ctx: self.ctx.clone(),
                 };
                 let result = self.inner.[< visit_ $method >]($name)
                     .map_err(|e| $type::Error::custom(e.to_string()));
@@ -161,7 +159,7 @@ macro_rules! impl_visit_method {
     };
 }
 
-impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V> {
+impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for JsVisitor<V> {
     type Value = V::Value;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -191,12 +189,12 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
     impl_visit_method!(borrowed_bytes(v: &'de [u8]));
     impl_visit_method!(byte_buf(v: Vec<u8>));
     impl_visit_method!(
-        some<D: serde::de::Deserializer<'de>>(deserializer: D) -> PageDeserializer;
+        some<D: serde::de::Deserializer<'de>>(deserializer: D) -> JsDeserializer;
 
         let deserializer = Box::new(<dyn erased_serde::Deserializer<'de>>::erase(deserializer));
     );
     impl_visit_method!(
-        newtype_struct<D: serde::de::Deserializer<'de>>(deserializer: D) -> PageDeserializer;
+        newtype_struct<D: serde::de::Deserializer<'de>>(deserializer: D) -> JsDeserializer;
 
         let deserializer = Box::new(<dyn erased_serde::Deserializer<'de>>::erase(deserializer));
     );
@@ -205,13 +203,13 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
         struct SeqAccess<A> {
             inner: A,
-            page: Arc<PageInner>,
+            ctx: JsRemoteObjectCtx,
         }
         impl<'de, A: serde::de::SeqAccess<'de>> serde::de::SeqAccess<'de> for SeqAccess<A> {
             type Error = A::Error;
 
             fn next_element_seed<T: serde::de::DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error> {
-                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
+                let seed = JsDeserializeSeed::new(self.ctx.clone(), seed);
                 self.inner.next_element_seed(seed)
             }
 
@@ -225,7 +223,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
         struct MapAccess<A> {
             inner: A,
-            page: Arc<PageInner>,
+            ctx: JsRemoteObjectCtx,
         }
         impl<'de, A: serde::de::MapAccess<'de>> serde::de::MapAccess<'de> for MapAccess<A> {
             type Error = A::Error;
@@ -234,7 +232,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
                 self.inner.next_key_seed(seed)
             }
             fn next_value_seed<V: serde::de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {
-                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
+                let seed = JsDeserializeSeed::new(self.ctx.clone(), seed);
                 self.inner.next_value_seed(seed)
             }
             fn size_hint(&self) -> Option<usize> {
@@ -247,7 +245,7 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
         struct VariantAccess<A> {
             inner: A,
-            page: Arc<PageInner>,
+            ctx: JsRemoteObjectCtx,
         }
         impl<'de, A: serde::de::VariantAccess<'de>> serde::de::VariantAccess<'de> for VariantAccess<A> {
             type Error = A::Error;
@@ -257,30 +255,30 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
             }
 
             fn newtype_variant_seed<T: serde::de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value, Self::Error> {
-                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
+                let seed = JsDeserializeSeed::new(self.ctx.clone(), seed);
                 self.inner.newtype_variant_seed(seed)
             }
 
             fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
             where V: serde::de::Visitor<'de> {
-                self.inner.tuple_variant(len, PageVisitor {
+                self.inner.tuple_variant(len, JsVisitor {
                     inner: visitor,
-                    page: self.page.clone(),
+                    ctx: self.ctx.clone(),
                 })
             }
 
             fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>
             where V: serde::de::Visitor<'de> {
-                self.inner.struct_variant(fields, PageVisitor {
+                self.inner.struct_variant(fields, JsVisitor {
                     inner: visitor,
-                    page: self.page.clone(),
+                    ctx: self.ctx.clone(),
                 })
             }
         }
 
         struct EnumAccess<A> {
             inner: A,
-            page: Arc<PageInner>,
+            ctx: JsRemoteObjectCtx,
         }
         impl<'de, A: serde::de::EnumAccess<'de>> serde::de::EnumAccess<'de> for EnumAccess<A> {
             type Error = A::Error;
@@ -288,13 +286,13 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for PageVisitor<V>
 
             fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
             where V: serde::de::DeserializeSeed<'de> {
-                let seed = PageDeserializeSeed::new(self.page.clone(), seed);
+                let seed = JsDeserializeSeed::new(self.ctx.clone(), seed);
                 let (value, variant) = self.inner.variant_seed(seed)?;
                 Ok((
                     value,
                     VariantAccess {
                         inner: variant,
-                        page: self.page.clone(),
+                        ctx: self.ctx.clone(),
                     },
                 ))
             }

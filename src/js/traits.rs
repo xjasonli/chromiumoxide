@@ -1,5 +1,3 @@
-use serde_json::Value as JsonValue;
-
 /// A trait for types that can be converted to and from JavaScript values.
 /// 
 /// This is a convenience trait that combines [`NativeValueIntoJs`] and [`NativeValueFromJs`].
@@ -54,6 +52,19 @@ pub trait IntoJs<T: ?Sized = JsAny> : serde::Serialize + std::fmt::Debug + Send 
 /// can be converted to a JavaScript value.
 impl<T: serde::Serialize + std::fmt::Debug + Send + Sync + ?Sized> IntoJs for T {
     type FromJs = JsAny;
+}
+
+pub trait ErasedIntoJs: erased_serde::Serialize + std::fmt::Debug + Send + Sync {}
+impl<T: erased_serde::Serialize + std::fmt::Debug + Send + Sync + ?Sized> ErasedIntoJs for T {}
+
+pub type BoxedIntoJs<'a> = Box<dyn ErasedIntoJs + 'a>;
+impl<'a> serde::Serialize for dyn ErasedIntoJs + 'a {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        let erased: &dyn erased_serde::Serialize = self;
+        erased.serialize(serializer)
+    }
 }
 
 /// A trait for types that can be converted to a JavaScript T value reference.
@@ -155,24 +166,53 @@ impl_from_js_args!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 /// This is an internal trait used to implement function argument serialization.
 /// It is implemented for tuples of up to 10 elements, where each element implements
 /// [`NativeValueIntoJs`].
-pub trait IntoJsArgs: private::into_js::Sealed {}
+pub trait IntoJsArgs<'a>: private::into_js::Sealed<'a> {}
 
 macro_rules! impl_into_js_args {
-    ($($($name:ident),+)?) => {
+    (
+        $($($name:ident),+)?
+    ) => {
         paste::paste!{
-            impl$(<$($name: IntoJs),+>)? IntoJsArgs for ($($($name,)+)?) {}
-            impl$(<$($name: IntoJs),+>)? private::into_js::Sealed for ($($($name,)+)?) {
-                fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
+            impl<'a, $($($name),+)?> IntoJsArgs<'a> for ($($($name,)+)?)
+            $(
+                where
+                    $(
+                        $name: IntoJs + 'a,
+                    )+
+            )?
+            {}
+
+            impl<'a, $($($name),+)?> private::into_js::Sealed<'a> for ($($($name,)+)?)
+            $(
+                where
+                    $(
+                        $name: IntoJs + 'a,
+                    )+
+            )?
+            {
+                //fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error> {
+                //    $(
+                //        let ($([< $name:lower >],)+) = self;
+                //    )?
+                //    Ok(vec![
+                //        $(
+                //            $(
+                //                serde_json::to_value([< $name:lower >])?,
+                //            )+
+                //        )?
+                //    ])
+                //}
+                fn into_vec(self) -> Vec<BoxedIntoJs<'a>> {
                     $(
                         let ($([< $name:lower >],)+) = self;
                     )?
-                    Ok(vec![
+                    vec![
                         $(
                             $(
-                                serde_json::to_value([< $name:lower >])?,
+                                Box::new([< $name:lower >]),
                             )+
                         )?
-                    ])
+                    ]
                 }
             }
         }
@@ -201,8 +241,9 @@ mod private {
     pub mod into_js {
         use super::*;
 
-        pub trait Sealed: Send + Sync {
-            fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error>;
+        pub trait Sealed<'a>: Send + Sync {
+            //fn into_json_values(self) -> Result<Vec<JsonValue>, serde_json::Error>;
+            fn into_vec(self) -> Vec<BoxedIntoJs<'a>>;
         }
     }
 }

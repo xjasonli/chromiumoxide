@@ -1246,7 +1246,7 @@ impl Page {
     /// 
     /// // Evaluate with this context
     /// let context: JsObject = page.eval("{ value: 42 }").await?;
-    /// let params = ScopedEvalParams::new("this.value * 2").expr_this(context);
+    /// let params = ScopedEvalParams::new("this.value * 2").this(context);
     /// let result: i32 = page.eval(params).await?;
     /// assert_eq!(result, 84);
     /// 
@@ -1257,7 +1257,7 @@ impl Page {
     ///     getValue() { return this.data.count; }
     /// }"#).await?;
     /// 
-    /// let params = ScopedEvalParams::new("this.getValue() + this.data.count").expr_this(obj);
+    /// let params = ScopedEvalParams::new("this.getValue() + this.data.count").this(obj);
     /// let result: i32 = page.eval(params).await?;
     /// assert_eq!(result, 20); // 10 + 10
     /// # Ok(())
@@ -1364,8 +1364,8 @@ impl Page {
     ///     }
     /// }"#).await?;
     /// 
-    /// // Use expr_this to get method from object
-    /// let params = ScopedEvalParams::new("this.compute").expr_this(obj.clone());
+    /// // Use this to get method from object
+    /// let params = ScopedEvalParams::new("this.compute").this(obj.clone());
     /// let result = page.invoke_function(params)
     ///     .this(obj)  // Set this binding for method execution
     ///     .argument(50)?
@@ -1387,8 +1387,8 @@ impl Page {
     ///     }
     /// }"#).await?;
     /// 
-    /// // Use expr_this to get nested method
-    /// let params = ScopedEvalParams::new("this.utils.transform").expr_this(obj.clone());
+    /// // Use this to get nested method
+    /// let params = ScopedEvalParams::new("this.utils.transform").this(obj.clone());
     /// let result = page.invoke_function(params)
     ///     .this(obj)  // Set this binding for method execution
     ///     .argument(obj.get_property::<Vec<i32>>("data.items").await?)?

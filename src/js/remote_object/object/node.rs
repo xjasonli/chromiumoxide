@@ -64,7 +64,7 @@ pub use attr::*;
 
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Node
-    class Node extends Object {
+    class Node extends EventTarget inherits Object {
         static #subtype: "node";
 
         properties: {
@@ -183,7 +183,7 @@ impl JsNode {
     /// Returns `None` if the DOM domain is not enabled. The DOM domain must be enabled
     /// via `DOM.enable` before node IDs can be retrieved.
     pub fn node_id(&self) -> Option<NodeId> {
-        match self.remote_subtype() {
+        match self.remote_object_subtype() {
             JsObjectSubtype::Node { node_id, ..  } => {
                 node_id.map(NodeId::new)
             }
@@ -196,14 +196,13 @@ impl JsNode {
     /// This ID is unique within the current page's lifetime and can be used
     /// for CDP protocol calls that require a node identifier.
     pub fn backend_node_id(&self) -> BackendNodeId {
-        match self.remote_subtype() {
+        match self.remote_object_subtype() {
             JsObjectSubtype::Node { backend_node_id, ..  } => {
                 BackendNodeId::new(backend_node_id)
             }
             _ => panic!("JsNode is not a node"),
         }
     }
-
 
     /// Returns the box model of the node
     pub async fn box_model(&self) -> Result<BoxModel> {
@@ -271,8 +270,8 @@ impl schemars::JsonSchema for JsDocumentPosition {
     fn schema_id() -> std::borrow::Cow<'static, str> {
         concat!(module_path!(), "::JsDocumentPosition").into()
     }
-    fn json_schema(gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        gen.subschema_for::<u32>()
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        generator.subschema_for::<u32>()
     }
 }
 

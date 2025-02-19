@@ -68,11 +68,12 @@ pub(crate) mod base64 {
 
 /// Creates a javascript function string as `(<function>)("<param 1>", "<param
 /// 2>")`
-pub fn evaluation_string<Args: IntoJsArgs>(
+pub fn evaluation_string<'a, Args: IntoJsArgs<'a>>(
     function: impl AsRef<str>,
     params: Args
 ) -> Result<String, serde_json::Error> {
-    let values = params.into_json_values()?;
+    let values = params.into_vec();
+    //let values = params.into_json_values()?;
     let params = values
         .iter()
         .map(|s| serde_json::to_string(s))

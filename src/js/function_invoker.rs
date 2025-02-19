@@ -6,7 +6,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use chromiumoxide_cdp::cdp::js_protocol::runtime::CallArgument;
 use schemars::Schema;
 
 use crate::handler::PageInner;
@@ -32,12 +31,11 @@ use super::*;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionInvoker<'a> {
     page: Arc<PageInner>,
     target: helper::EvalTarget<'a>,
-    this: Option<JsRemoteObject>,
-    params: InvokeParams,
+    params: InvokeParams<'a>,
     options: EvalOptions,
 }
 
@@ -47,11 +45,11 @@ impl<'a> FunctionInvoker<'a> {
         target: helper::EvalTarget<'a>,
         options: EvalOptions
     ) -> Self {
-        Self { page, target, this: None, params: InvokeParams::new(), options }
+        Self { page, target, params: InvokeParams::new(), options }
     }
 
-    pub fn this<T: AsJs<JsRemoteObject>>(mut self, this: T) -> Self {
-        self.this = Some(this.as_js().clone());
+    pub fn this<T: IntoJs + 'a>(mut self, this: T) -> Self {
+        self.params.this(this);
         self
     }
 
@@ -64,9 +62,9 @@ impl<'a> FunctionInvoker<'a> {
     /// 
     /// # Returns
     /// Returns self for method chaining
-    pub fn argument<T: IntoJs>(mut self, argument: T) -> Result<Self> {
-        self.params.argument(argument)?;
-        Ok(self)
+    pub fn argument<T: IntoJs + 'a>(mut self, argument: T) -> Self {
+        self.params.argument(argument);
+        self
     }
 
     /// Adds multiple arguments to the function call from a tuple.
@@ -79,12 +77,12 @@ impl<'a> FunctionInvoker<'a> {
     /// 
     /// # Returns
     /// Returns self for method chaining
-    pub fn arguments<Args>(mut self, arguments: Args) -> Result<Self>
+    pub fn arguments<Args>(mut self, arguments: Args) -> Self
     where
-        Args: IntoJsArgs,
+        Args: IntoJsArgs<'a>,
     {
-        self.params.arguments(arguments)?;
-        Ok(self)
+        self.params.arguments(arguments);
+        self
     }
 
     /// Adds multiple arguments to the function call from an iterator, similar to JavaScript's spread syntax.
@@ -113,13 +111,13 @@ impl<'a> FunctionInvoker<'a> {
     /// 
     /// # Returns
     /// Returns self for method chaining
-    pub fn arguments_spread<I, T>(mut self, arguments: I) -> Result<Self>
+    pub fn arguments_spread<I, T>(mut self, arguments: I) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: IntoJs,
+        T: IntoJs + 'a,
     {
-        self.params.arguments_spread(arguments)?;
-        Ok(self)
+        self.params.arguments_spread(arguments);
+        self
     }
 
     /// Executes the function with the configured arguments and converts the result.
@@ -141,101 +139,67 @@ impl<'a> FunctionInvoker<'a> {
             settings.inline_subschemas = true;
             settings.into_generator().into_root_schema_for::<T>()
         };
+        let page = self.page.clone();
+        let (value, execution_context_id) = self.invoke_with_schema(schema).await?;
 
         let value = serde::de::DeserializeSeed::deserialize(
-            de::PageDeserializeSeed::new(self.page.clone(), PhantomData),
-            self.invoke_with_schema(schema).await?
+            de::JsDeserializeSeed::new(
+                JsRemoteObjectCtx::new(page, execution_context_id),
+                PhantomData,
+            ),
+            value
         )?;
         Ok(value)
     }
 
-    pub(crate) async fn invoke_with_schema(self, schema: Schema) -> Result<JsonValue> {
-        let params = self.target.into_params(
+    pub(crate) async fn invoke_with_schema(self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
+        let (params, execution_context_id) = self.target.into_params(
             self.page.clone(),
-            Some((self.this, self.params)),
+            Some(self.params),
             schema,
             self.options
         ).await?;
-        helper::execute(self.page, params).await
+        let value = helper::execute(self.page, params).await?;
+        Ok((value, execution_context_id))
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct InvokeParams {
-    // `this` context for the function
-    //pub(crate) this: Option<JsRemoteObject>,
+#[derive(Debug, Default)]
+#[derive(serde::Serialize)]
+#[serde(transparent)]
+pub(crate) struct InvokeParams<'a>(Vec<BoxedIntoJs<'a>>);
 
-    // Arguments to pass to the function
-    pub(crate) arguments: Vec<JsonValue>,
-
-    // Remote object references used in the call
-    pub(crate) remotes: Vec<JsRemoteObject>,
-}
-
-impl InvokeParams {
-    /// Creates a new parameter set with the given `this` context.
+impl<'a> InvokeParams<'a> {
+    /// Creates a new parameter set.
     pub fn new() -> Self {
-        Self { arguments: vec![], remotes: vec![] }
+        Self(vec![Box::new(())])
+    }
+
+    pub fn this<T: IntoJs + 'a>(&mut self, this: T) {
+        self.0[0] = Box::new(this);
     }
 
     /// Adds a single argument value.
-    pub fn argument<T: IntoJs>(&mut self, value: T) -> Result<()> {
-        self.arguments.push(serde_json::to_value(value)?);
-        Ok(())
+    pub fn argument<T: IntoJs + 'a>(&mut self, value: T) {
+        self.0.push(Box::new(value));
     }
 
     /// Adds multiple arguments from a tuple.
-    pub fn arguments<Args>(&mut self, arguments: Args) -> Result<()>
+    pub fn arguments<Args>(&mut self, arguments: Args)
     where
-        Args: IntoJsArgs,
+        Args: IntoJsArgs<'a>,
     {
-        self.arguments.extend(Args::into_json_values(arguments)?);
-        Ok(())
+        self.0.extend(Args::into_vec(arguments));
     }
 
     /// Adds multiple arguments from an iterator.
-    pub fn arguments_spread<I, T>(&mut self, arguments: I) -> Result<()>
+    pub fn arguments_spread<I, T>(&mut self, arguments: I)
     where
         I: IntoIterator<Item = T>,
-        T: IntoJs,
+        T: IntoJs + 'a,
     {
-        self.arguments.extend(
-            arguments.into_iter()
-                .map(|arg| -> Result<_> { Ok(serde_json::to_value(arg)?) } )
-                .collect::<Result<Vec<_>>>()?
+        self.0.extend(
+            arguments.into_iter().map(|arg| -> BoxedIntoJs<'a> { Box::new(arg) })
         );
-        Ok(())
-    }
-
-    /// Converts the parameters into CDP call arguments.
-    pub fn into_arguments(self, this: Option<JsRemoteObject>, expr_list: &mut Vec<(helper::JsonPointer, String)>, remotes: &mut Vec<JsRemoteObject>) -> Result<Vec<CallArgument>> {
-        let mut args = vec![];
-
-        let mut descriptors = vec![];
-        let mut specials = vec![];
-        for (i, arg) in self.arguments.into_iter().enumerate() {
-            let prefix = [helper::JsonPointerSegment::Index(i)];
-            let (descriptor, special) = helper::ValueDescriptor::parse_with_expr(
-                arg,
-                &prefix,
-                expr_list
-            );
-            descriptors.push(descriptor);
-            specials.extend(special);
-        }
-        for special in specials {
-            args.push(special.into_call_argument());
-        }
-        args.push(CallArgument{
-            value: Some(serde_json::to_value(descriptors)?),
-            ..Default::default()
-        });
-        args.push(CallArgument{
-            object_id: this.map(|v| v.remote_id()),
-            ..Default::default()
-        });
-
-        remotes.extend(self.remotes);
-        Ok(args)
     }
 }

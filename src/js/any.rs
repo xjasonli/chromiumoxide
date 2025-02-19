@@ -223,15 +223,15 @@ macro_rules! define_any_of {
                         Err(E::custom(concat!("data did not match AnyOf", stringify!($n))))
                     }
 
-                    let page = de::PageDeserializer::get(&deserializer);
+                    let ctx = de::JsDeserializer::get(&deserializer);
                     let content = serde_content::Value::deserialize(deserializer)?;
-                    if let Some(page) = page {
+                    if let Some(ctx) = ctx {
                         de(||
-                            de::PageDeserializer::new(
+                            de::JsDeserializer::new(
                                 content.clone()
                                     .into_deserializer()
                                     .human_readable(),
-                                page.clone(),
+                                ctx.clone(),
                             )
                         )
                     } else {

@@ -11,81 +11,15 @@ pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
 
 #[derive(Debug, Clone)]
 pub(crate) enum SpecialValue {
-    Remote(JsRemote),
+    Remote(JsRemoteVal),
     BigInt(JsBigInt),
     Undefined(JsUndefined),
 }
 
 impl SpecialValue {
     pub async fn from_remote_object(page: &Arc<PageInner>, remote_object: RemoteObject) -> Result<Self> {
-        if let Some(id) = remote_object.object_id {
-            let r#type = match remote_object.r#type {
-                RemoteObjectType::Object => {
-                    let subtype = match remote_object.subtype {
-                        Some(subtype) => {
-                            match subtype {
-                                RemoteObjectSubtype::Array => JsObjectSubtype::Array,
-                                RemoteObjectSubtype::Node => {
-                                    let node = {
-                                        let params = DescribeNodeParams::builder()
-                                            .object_id(id.clone())
-                                            .build();
-                                        let response = page.execute(params).await?;
-                                        response.result.node
-                                    };
-                                    let node_id = if *node.node_id.inner() == 0 {
-                                        None
-                                    } else {
-                                        Some(*node.node_id.inner())
-                                    };
-                                    let backend_node_id = *node.backend_node_id.inner();
-
-                                    JsObjectSubtype::Node {
-                                        node_id,
-                                        backend_node_id,
-                                    }
-                                }
-                                RemoteObjectSubtype::Regexp => JsObjectSubtype::RegExp,
-                                RemoteObjectSubtype::Date => JsObjectSubtype::Date,
-                                RemoteObjectSubtype::Map => JsObjectSubtype::Map,
-                                RemoteObjectSubtype::Set => JsObjectSubtype::Set,
-                                RemoteObjectSubtype::Weakmap => JsObjectSubtype::WeakMap,
-                                RemoteObjectSubtype::Weakset => JsObjectSubtype::WeakSet,
-                                RemoteObjectSubtype::Iterator => JsObjectSubtype::Iterator,
-                                RemoteObjectSubtype::Generator => JsObjectSubtype::Generator,
-                                RemoteObjectSubtype::Error => JsObjectSubtype::Error,
-                                RemoteObjectSubtype::Proxy => JsObjectSubtype::Proxy,
-                                RemoteObjectSubtype::Promise => JsObjectSubtype::Promise,
-                                RemoteObjectSubtype::Typedarray => JsObjectSubtype::TypedArray,
-                                RemoteObjectSubtype::Arraybuffer => JsObjectSubtype::ArrayBuffer,
-                                RemoteObjectSubtype::Dataview => JsObjectSubtype::DataView,
-                                RemoteObjectSubtype::Webassemblymemory => JsObjectSubtype::WebAssemblyMemory,
-                                RemoteObjectSubtype::Wasmvalue => JsObjectSubtype::WasmValue,
-                                RemoteObjectSubtype::Null => {
-                                    return Err(CdpError::UnexpectedValue(format!("Unsupported remote object subtype: {subtype:?}")));
-                                }
-                            }
-                        }
-                        None => JsObjectSubtype::None,
-                    };
-                    JsRemoteObjectType::Object(subtype)
-                }
-                RemoteObjectType::Function => {
-                    JsRemoteObjectType::Function
-                }
-                RemoteObjectType::Symbol => {
-                    JsRemoteObjectType::Symbol
-                }
-                ty => {
-                    return Err(CdpError::UnexpectedValue(format!("Unsupported remote object type: {ty:?}")));
-                }
-            };
-            let remote = JsRemote {
-                id: id.clone(),
-                r#type: r#type,
-                class: remote_object.class_name.unwrap_or_default(),
-            };
-            return Ok(Self::Remote(remote));
+        if remote_object.object_id.is_some() {
+            return Ok(Self::Remote(JsRemoteVal::from_remote_object(page, remote_object).await?));
         }
         if remote_object.r#type == RemoteObjectType::Bigint {
             let mut value: String = remote_object.unserializable_value.unwrap().into();
@@ -119,7 +53,7 @@ impl SpecialValue {
     }
 
     pub fn from_json(json: &JsonObject) -> Option<Self> {
-        if let Ok(remote) = JsRemote::deserialize(json) {
+        if let Ok(remote) = JsRemoteVal::deserialize(json) {
             return Some(SpecialValue::Remote(remote));
         }
         if let Ok(big_int) = JsBigInt::deserialize(json) {
@@ -141,17 +75,24 @@ impl SpecialValue {
         Ok(value)
     }
 
-    pub fn remote_id(&self) -> Option<&RemoteObjectId> {
+    pub fn remote_object_id(&self) -> Option<RemoteObjectId> {
         match self {
-            SpecialValue::Remote(remote) => Some(&remote.id),
+            SpecialValue::Remote(remote) => Some(remote.id.clone()),
             _ => None,
         }
     }
 }
 
-impl From<JsRemote> for SpecialValue {
-    fn from(data: JsRemote) -> Self {
+impl From<JsRemoteVal> for SpecialValue {
+    fn from(data: JsRemoteVal) -> Self {
         SpecialValue::Remote(data)
+    }
+}
+
+impl From<JsRemoteObject> for SpecialValue {
+    fn from(remote_object: JsRemoteObject) -> Self {
+        let data = remote_object.val();
+        SpecialValue::Remote(data.clone())
     }
 }
 
@@ -169,13 +110,89 @@ impl From<JsBigInt> for SpecialValue {
 
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct JsRemote {
+pub(crate) struct JsRemoteVal {
     pub(crate) id: RemoteObjectId,
     pub(crate) r#type: JsRemoteObjectType,
     pub(crate) class: String,
 }
 
-impl serde::Serialize for JsRemote {
+impl JsRemoteVal {
+    pub(crate) async fn from_remote_object(page: &Arc<PageInner>, remote_object: RemoteObject) -> Result<Self> {
+        let Some(object_id) = remote_object.object_id else {
+            return Err(CdpError::UnexpectedValue(format!("Remote object has no object id: {remote_object:?}")));
+        };
+
+        let r#type = match remote_object.r#type {
+            RemoteObjectType::Object => {
+                let subtype = match remote_object.subtype {
+                    Some(subtype) => {
+                        match subtype {
+                            RemoteObjectSubtype::Array => JsObjectSubtype::Array,
+                            RemoteObjectSubtype::Node => {
+                                let node = {
+                                    let params = DescribeNodeParams::builder()
+                                        .object_id(object_id.clone())
+                                        .build();
+                                    let response = page.execute(params).await?;
+                                    response.result.node
+                                };
+                                let node_id = if *node.node_id.inner() == 0 {
+                                    None
+                                } else {
+                                    Some(*node.node_id.inner())
+                                };
+                                let backend_node_id = *node.backend_node_id.inner();
+
+                                JsObjectSubtype::Node {
+                                    node_id,
+                                    backend_node_id,
+                                }
+                            }
+                            RemoteObjectSubtype::Regexp => JsObjectSubtype::RegExp,
+                            RemoteObjectSubtype::Date => JsObjectSubtype::Date,
+                            RemoteObjectSubtype::Map => JsObjectSubtype::Map,
+                            RemoteObjectSubtype::Set => JsObjectSubtype::Set,
+                            RemoteObjectSubtype::Weakmap => JsObjectSubtype::WeakMap,
+                            RemoteObjectSubtype::Weakset => JsObjectSubtype::WeakSet,
+                            RemoteObjectSubtype::Iterator => JsObjectSubtype::Iterator,
+                            RemoteObjectSubtype::Generator => JsObjectSubtype::Generator,
+                            RemoteObjectSubtype::Error => JsObjectSubtype::Error,
+                            RemoteObjectSubtype::Proxy => JsObjectSubtype::Proxy,
+                            RemoteObjectSubtype::Promise => JsObjectSubtype::Promise,
+                            RemoteObjectSubtype::Typedarray => JsObjectSubtype::TypedArray,
+                            RemoteObjectSubtype::Arraybuffer => JsObjectSubtype::ArrayBuffer,
+                            RemoteObjectSubtype::Dataview => JsObjectSubtype::DataView,
+                            RemoteObjectSubtype::Webassemblymemory => JsObjectSubtype::WebAssemblyMemory,
+                            RemoteObjectSubtype::Wasmvalue => JsObjectSubtype::WasmValue,
+                            RemoteObjectSubtype::Null => {
+                                return Err(CdpError::UnexpectedValue(format!("Unsupported remote object subtype: {subtype:?}")));
+                            }
+                        }
+                    }
+                    None => JsObjectSubtype::None,
+                };
+                JsRemoteObjectType::Object(subtype)
+            }
+            RemoteObjectType::Function => {
+                JsRemoteObjectType::Function
+            }
+            RemoteObjectType::Symbol => {
+                JsRemoteObjectType::Symbol
+            }
+            ty => {
+                return Err(CdpError::UnexpectedValue(format!("Unsupported remote object type: {ty:?}")));
+            }
+        };
+        let this = JsRemoteVal {
+            id: object_id.clone(),
+            r#type: r#type,
+            class: remote_object.class_name.unwrap_or_default(),
+        };
+        Ok(this)
+    }
+}
+
+impl serde::Serialize for JsRemoteVal {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(serde::Serialize)]
         struct Proxy<'a> {
@@ -198,7 +215,7 @@ impl serde::Serialize for JsRemote {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for JsRemote {
+impl<'de> serde::Deserialize<'de> for JsRemoteVal {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -262,7 +279,7 @@ impl<'de> serde::Deserialize<'de> for JsRemote {
     }
 }
 
-impl schemars::JsonSchema for JsRemote {
+impl schemars::JsonSchema for JsRemoteVal {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed("JsRemoteValueData")
     }

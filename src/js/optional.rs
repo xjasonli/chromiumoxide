@@ -230,11 +230,11 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Optional<T> {
             Err(E::custom("data did not match Optional"))
         }
 
-        let page = de::PageDeserializer::get(&deserializer);
+        let page = de::JsDeserializer::get(&deserializer);
         let content = serde_content::Value::deserialize(deserializer)?;
         if let Some(page) = page {
             de(||
-                de::PageDeserializer::new(
+                de::JsDeserializer::new(
                     content.clone()
                         .into_deserializer()
                         .human_readable(),

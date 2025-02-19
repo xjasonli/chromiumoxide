@@ -1,5 +1,6 @@
 use super::*;
 
+pub mod objects;
 pub mod array;
 pub mod node;
 pub mod reg_exp;
@@ -19,6 +20,7 @@ pub mod data_view;
 pub mod wasm_memory;
 pub mod wasm_value;
 
+pub use objects::*;
 pub use array::*;
 pub use node::*;
 pub use reg_exp::*;
@@ -41,7 +43,7 @@ pub use wasm_value::*;
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
     class Object {
-        static #type: "object";
+        static #type: ["object", "function"];
 
         properties: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor
@@ -95,8 +97,8 @@ js_remote_object!(
 );
 
 impl JsObject {
-    pub fn remote_subtype(&self) -> JsObjectSubtype {
-        self.remote_type()
+    pub fn remote_object_subtype(&self) -> JsObjectSubtype {
+        self.remote_object_type()
             .object_subtype()
             .expect("JsObject is not an object")
     }
@@ -122,162 +124,3 @@ pub struct JsAccessorDescriptor {
     configurable: bool,
     enumerable: bool,
 }
-
-js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-    class EventTarget extends Object {
-        static #subtype: "none";
-        static #class: "EventTarget";
-
-        methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
-            addEventListener(name: &str, listener: JsFunction, options?: JsObject) -> ();
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener
-            removeEventListener(name: &str, listener: JsFunction, options?: JsObject) -> ();
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
-            dispatchEvent(event: JsObject) -> bool;
-        }
-    }
-}
-
-js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Window
-    class Window extends Object {
-        static #subtype: "none";
-        static #class: "Window";
-
-        properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/document
-            document: JsDocument [readonly];
-
-            // todo
-        }
-        methods: {
-            // todo
-        }
-    }
-);
-
-js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Location
-    class Location extends Object {
-        static #subtype: "none";
-        static #class: "Location";
-
-        properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/ancestorOrigins
-            ancestorOrigins: Vec<String> [readonly] {
-                get() {
-                    return Array.from(this.ancestorOrigins);
-                }
-            }
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/href
-            href: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/protocol
-            protocol: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/host
-            host: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/hostname
-            hostname: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/port
-            port: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/pathname
-            pathname: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/search
-            search: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/hash
-            hash: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/origin
-            origin: String [readonly];
-        }
-        methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/assign
-            assign(url: &str) -> ();
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/reload
-            reload() -> ();
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Location/replace
-            replace<T: IntoJs>(url: T) -> ();
-        }
-    }
-);
-
-js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/FileList
-    class FileList extends Object {
-        static #subtype: "none";
-        static #class: "FileList";
-
-        properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileList/length
-            length: u32 [readonly];
-        }
-        methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileList/item
-            item(index: u32) -> Option<JsFile>;
-        }
-    }
-);
-
-js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Blob
-    class Blob extends Object {
-        static #subtype: "none";
-        static #class: ["Blob", "File"];
-        properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/size
-            size: usize [readonly];
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/type
-            #[rename = typ]
-            type: String [readonly];
-        }
-        methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/arrayBuffer
-            arrayBuffer() -> JsArrayBuffer;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/bytes
-            bytes() -> JsTypedArray;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/slice
-            slice(start?: isize, end?: isize, content_type?: &str) -> JsBlob;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/stream
-            stream() -> JsObject;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Blob/text
-            text() -> String;
-        }
-    }
-);
-
-js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/File
-    class File extends Blob inherits Object {
-        static #subtype: "none";
-        static #class: "File";
-
-        properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/File/lastModified
-            lastModified: u64 [readonly];
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/File/name
-            name: String [readonly];
-
-            // https://developer.mozilla.org/en-US/docs/Web/API/File/webkitRelativePath
-            webkitRelativePath: String [readonly];
-        }
-    }
-);

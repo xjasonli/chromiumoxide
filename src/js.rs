@@ -2,12 +2,13 @@ use serde::de::DeserializeOwned;
 use serde_json::Value as JsonValue;
 
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{
-    CallFunctionOnParams, EvaluateParams, RemoteObject,
+    CallFunctionOnParams, EvaluateParams, ExecutionContextId, RemoteObject
 };
 
 use crate::utils::is_likely_js_function;
 
 pub(crate) mod helper;
+pub mod ser;
 pub mod de;
 pub mod any;
 pub mod traits;
@@ -19,7 +20,6 @@ pub mod function_invoker;
 pub mod optional;
 pub mod undefined;
 pub mod exposed_function;
-pub mod execution_context;
 
 pub use any::*;
 pub use traits::*;
@@ -31,7 +31,6 @@ pub use function_invoker::*;
 pub use optional::*;
 pub use undefined::*;
 pub use exposed_function::*;
-pub use execution_context::*;
 
 #[derive(Debug, Clone)]
 pub struct EvaluationResult {
@@ -165,7 +164,10 @@ impl Default for EvalOptions {
 
 #[derive(Debug, Clone)]
 pub struct EvalParams<'a> {
+    /// The expression to evaluate
     pub expr: JsExpr<'a>,
+
+    /// The options for the evaluation
     pub options: EvalOptions,
 }
 
@@ -174,16 +176,17 @@ impl<'a> EvalParams<'a> {
         Self { expr: expr.into(), options: EvalOptions::default() }
     }
 
+    /// Sets the options for the evaluation
     pub fn options(self, options: EvalOptions) -> Self {
         Self { options, ..self }
     }
 
-    pub fn into_scoped(self) -> ScopedEvalParams<'a> {
-        ScopedEvalParams::new(self.expr).options(self.options)
-    }
-
     pub fn into_global(self) -> GlobalEvalParams<'a> {
         GlobalEvalParams::new(self.expr).options(self.options)
+    }
+
+    pub fn into_scoped(self) -> ScopedEvalParams<'a> {
+        ScopedEvalParams::new(self.expr).options(self.options)
     }
 }
 
@@ -194,72 +197,35 @@ impl<'a, T: Into<JsExpr<'a>>> From<T> for EvalParams<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ScopedEvalParams<'a> {
-    pub expr: JsExpr<'a>,
-    pub expr_context: Option<JsExprContext>,
-    pub options: EvalOptions,
-}
-
-impl<'a> ScopedEvalParams<'a> {
-    pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
-        Self { expr: expr.into(), expr_context: None, options: EvalOptions::default() }
-    }
-
-    pub fn expr_this<T: AsJs<JsRemoteObject>>(self, this: T) -> Self {
-        let context = JsExprContext::new_with_this(this);
-        Self { expr_context: Some(context), ..self }
-    }
-
-    pub fn expr_execution_context<T: Into<ExecutionContext>>(self, context: T) -> Self {
-        let context = JsExprContext::new_with_context(context);
-        Self { expr_context: Some(context), ..self }
-    }
-
-    pub fn expr_execution_context_object<T: AsJs<JsRemoteObject>>(self, context: T) -> Self {
-        let context = JsExprContext::new_with_context_object(context);
-        Self { expr_context: Some(context), ..self }
-    }
-
-    pub fn expr_context<T: Into<JsExprContext>>(self, context: T) -> Self {
-        Self { expr_context: Some(context.into()), ..self }
-    }
-
-    pub fn options(self, options: EvalOptions) -> Self {
-        Self { options, ..self }
-    }
-}
-
-impl<'a, T: Into<JsExpr<'a>>> From<T> for ScopedEvalParams<'a> {
-    fn from(expr: T) -> Self {
-        ScopedEvalParams::new(expr)
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct GlobalEvalParams<'a> {
+    /// The expression to evaluate
     pub expr: JsExpr<'a>,
-    pub execution_context: Option<ExecutionContext>,
+
+    /// The options for the evaluation
     pub options: EvalOptions,
+
+    /// The execution context for the evaluation
+    pub execution_context_id: Option<ExecutionContextId>,
 }
 
 impl<'a> GlobalEvalParams<'a> {
     pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
-        Self { expr: expr.into(), execution_context: None, options: EvalOptions::default() }
-    }
-
-    pub fn execution_context<T: Into<ExecutionContext>>(self, context: T) -> Self {
-        Self { execution_context: Some(context.into()), ..self }
+        Self { expr: expr.into(), execution_context_id: None, options: EvalOptions::default() }
     }
 
     pub fn options(self, options: EvalOptions) -> Self {
         Self { options, ..self }
+    }
+
+    pub fn execution_context_id<T: Into<ExecutionContextId>>(self, execution_context_id: T) -> Self {
+        Self { execution_context_id: Some(execution_context_id.into()), ..self }
     }
 
     pub fn into_scoped(self) -> ScopedEvalParams<'a> {
         let scoped = ScopedEvalParams::new(self.expr)
             .options(self.options);
-        if let Some(execution_context) = self.execution_context {
-            scoped.expr_execution_context(execution_context)
+        if let Some(execution_context_id) = self.execution_context_id {
+            scoped.execution_context_id(execution_context_id)
         } else {
             scoped
         }
@@ -269,6 +235,56 @@ impl<'a> GlobalEvalParams<'a> {
 impl<'a, T: Into<JsExpr<'a>>> From<T> for GlobalEvalParams<'a> {
     fn from(expr: T) -> Self {
         GlobalEvalParams::new(expr)
+    }
+}
+
+#[derive(Debug)]
+pub struct ScopedEvalParams<'a> {
+    /// The expression to evaluate
+    pub expr: JsExpr<'a>,
+
+    /// The options for the evaluation
+    pub options: EvalOptions,
+
+    /// The execution context for the evaluation
+    pub execution_context_id: Option<ExecutionContextId>,
+
+    /// The execution context (identified by a remote object) for the evaluation
+    pub execution_context_object: Option<BoxedIntoJs<'a>>,
+
+    /// The `this` value for the evaluation
+    pub this: Option<BoxedIntoJs<'a>>,
+}
+
+impl<'a> ScopedEvalParams<'a> {
+    pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
+        Self { expr: expr.into(), this: None, execution_context_id: None, execution_context_object: None, options: EvalOptions::default() }
+    }
+
+    /// Sets the options for the evaluation
+    pub fn options(self, options: EvalOptions) -> Self {
+        Self { options, ..self }
+    }
+
+    /// Sets the execution context (identified by an id) for the evaluation
+    pub fn execution_context_id<U: Into<ExecutionContextId>>(self, execution_context_id: U) -> Self {
+        Self { execution_context_id: Some(execution_context_id.into()), ..self }
+    }
+
+    /// Sets the execution context (identified by a remote object) for the evaluation
+    pub fn execution_context_object<T: IntoJs + 'a>(self, context: T) -> Self {
+        Self { execution_context_object: Some(Box::new(context)), ..self }
+    }
+
+    /// Sets the `this` value for the evaluation
+    pub fn this<T: IntoJs + 'a>(self, this: T) -> Self {
+        Self { this: Some(Box::new(this)), ..self }
+    }
+}
+
+impl<'a, T: Into<JsExpr<'a>>> From<T> for ScopedEvalParams<'a> {
+    fn from(expr: T) -> Self {
+        ScopedEvalParams::new(expr)
     }
 }
 

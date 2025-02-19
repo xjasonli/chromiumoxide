@@ -394,8 +394,8 @@ impl schemars::JsonSchema for JsNodeFilter {
     fn schema_id() -> std::borrow::Cow<'static, str> {
         concat!(module_path!(), "::JsNodeFilter").into()
     }
-    fn json_schema(gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        gen.subschema_for::<u32>()
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        generator.subschema_for::<u32>()
     }
 }
 

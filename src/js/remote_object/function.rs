@@ -2,7 +2,7 @@ use super::*;
 
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function
-    class Function {
+    class Function extends Object {
         static #type: "function";
 
         properties: {
@@ -37,8 +37,8 @@ impl JsFunction {
     }
 
     pub fn invoke_with_options(&self, options: EvalOptions) -> FunctionInvoker<'static> {
-        helper::Evaluator::new_remote(
-            self.page(),
+        helper::Evaluator::new_object(
+            self.ctx().page(),
             self.clone(),
             options
         ).invoke()
