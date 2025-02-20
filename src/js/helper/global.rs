@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use chromiumoxide_cdp::cdp::js_protocol::runtime::EvaluateReturns;
+
 use crate::error::{CdpError, Result};
 use crate::handler::PageInner;
 
@@ -11,13 +13,18 @@ pub async fn eval_global<'a, R: FromJs>(
     execution_context_id: Option<ExecutionContextId>,
     options: EvalOptions,
 ) -> Result<R> {
-    let mut params = EvaluateParams::builder()
-        .expression(expr.into().into_inner())
-        .return_by_value(false)
-        .user_gesture(options.user_gesture)
-        .await_promise(options.await_promise)
-        .build()
-        .unwrap();
+    let schema = {
+        let mut settings = schemars::generate::SchemaSettings::default();
+        settings.inline_subschemas = true;
+        settings.into_generator().into_root_schema_for::<R>()
+    };
+    let return_mode = schema::parse_json_schema(&schema);
+    let return_by_value = match return_mode {
+        ReturnMode::Null => true,
+        ReturnMode::Undefined => true,
+        ReturnMode::ByValue => true,
+        _ => false,
+    };
     let execution_context_id = {
         if let Some(execution_context_id) = execution_context_id {
             execution_context_id
@@ -26,46 +33,46 @@ pub async fn eval_global<'a, R: FromJs>(
                 .ok_or(CdpError::msg("No execution context found"))?
         }
     };
-    params.context_id = Some(execution_context_id);
 
-    let resp = page.execute(params).await?.result;
-    if let Some(exception) = resp.exception_details {
+    let params = EvaluateParams::builder()
+        .expression(expr.into().into_inner())
+        .return_by_value(return_by_value)
+        .user_gesture(options.user_gesture)
+        .await_promise(options.await_promise)
+        .context_id(execution_context_id)
+        .build()
+        .unwrap();
+
+    let EvaluateReturns {
+        result,
+        exception_details,
+        ..
+    } = page.execute(params).await?.result;
+    if let Some(exception) = exception_details {
         return Err(CdpError::JavascriptException(Box::new(exception)));
+    }
+    if let ReturnMode::Complex = return_mode {
+        if let Some(_) = &result.object_id {
+            let remote_val = JsRemoteVal::from_remote_object(&page, result).await?;
+            let remote_object = JsRemoteObject::new(
+                JsRemoteObjectCtx::new(page.clone(), execution_context_id),
+                remote_val
+            );
+            let evaluator = Evaluator::new_object(
+                page.clone(),
+                remote_object,
+                options
+            );
+            return evaluator.eval().await;
+        }
     }
 
     let ctx = JsRemoteObjectCtx::new(page.clone(), execution_context_id);
-
-    let remote_object = resp.result;
-    if let Some(json) = remote_object.value {
-        Ok(
-            serde::de::DeserializeSeed::deserialize(
-                de::JsDeserializeSeed::new(ctx, std::marker::PhantomData),
-                json
-            )?
-        )
-    } else if let Ok(special) = SpecialValue::from_remote_object(&page, remote_object).await {
-        match special {
-            SpecialValue::Remote(remote) => {
-                let remote_object = JsRemoteObject::new(ctx, remote);
-                let evaluator = Evaluator::new_object(
-                    page.clone(),
-                    remote_object,
-                    options
-                );
-                return evaluator.eval().await;
-            }
-            SpecialValue::BigInt(big_int) => {
-                page.invoke_function("(x) => x")
-                    .argument(big_int)
-                    .invoke().await
-            }
-            SpecialValue::Undefined(undefined) => {
-                page.invoke_function("(x) => x")
-                    .argument(undefined)
-                    .invoke().await
-            }
-        }
-    } else {
-        return Err(CdpError::msg("No value found"));
-    }
+    let value = parse_remote_object(page, result).await?;
+    Ok(
+        serde::de::DeserializeSeed::deserialize(
+            de::JsDeserializeSeed::new(ctx, std::marker::PhantomData),
+            value
+        )?
+    )
 }

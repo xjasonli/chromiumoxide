@@ -141,7 +141,6 @@ impl<'a> FunctionInvoker<'a> {
         };
         let page = self.page.clone();
         let (value, execution_context_id) = self.invoke_with_schema(schema).await?;
-
         let value = serde::de::DeserializeSeed::deserialize(
             de::JsDeserializeSeed::new(
                 JsRemoteObjectCtx::new(page, execution_context_id),
@@ -153,13 +152,13 @@ impl<'a> FunctionInvoker<'a> {
     }
 
     pub(crate) async fn invoke_with_schema(self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
-        let (params, execution_context_id) = self.target.into_params(
+        let (value, execution_context_id) = helper::evaluate(
             self.page.clone(),
+            self.target,
             Some(self.params),
             schema,
             self.options
         ).await?;
-        let value = helper::execute(self.page, params).await?;
         Ok((value, execution_context_id))
     }
 }

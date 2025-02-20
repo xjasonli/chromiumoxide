@@ -1,5 +1,10 @@
-use chromiumoxide_cdp::cdp::js_protocol::runtime::RemoteObjectId;
+use std::sync::Arc;
+
+use chromiumoxide_cdp::cdp::js_protocol::runtime::{RemoteObjectId, RemoteObjectType};
 use serde::{Serialize, Deserialize};
+
+use crate::handler::PageInner;
+use crate::error::{CdpError, Result};
 
 use super::*;
 
@@ -7,6 +12,7 @@ mod special_value;
 mod evaluator;
 mod global;
 mod patterns;
+mod schema;
 
 pub(crate) use special_value::*;
 pub(crate) use evaluator::*;
@@ -18,11 +24,28 @@ type JsonObject = serde_json::Map<String, JsonValue>;
 pub(crate) type JsonPointer = Vec<JsonPointerSegment>;
 pub(crate) type JsonPointerRef<'a> = &'a [JsonPointerSegment];
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub(crate) enum JsonPointerSegment {
     Field(String),
     Index(usize),
+}
+
+impl std::cmp::PartialOrd for JsonPointerSegment {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (JsonPointerSegment::Index(n1), JsonPointerSegment::Index(n2)) => Some(n1.cmp(n2)),
+            (JsonPointerSegment::Field(s1), JsonPointerSegment::Field(s2)) => Some(s1.cmp(s2)),
+            (JsonPointerSegment::Index(_), JsonPointerSegment::Field(_)) => Some(std::cmp::Ordering::Less),
+            (JsonPointerSegment::Field(_), JsonPointerSegment::Index(_)) => Some(std::cmp::Ordering::Greater),
+        }
+    }
+}
+
+impl std::cmp::Ord for JsonPointerSegment {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl From<String> for JsonPointerSegment {
@@ -182,4 +205,25 @@ mod utils {
         }
         Ok(())
     }
+}
+
+async fn parse_remote_object(page: Arc<PageInner>, remote_object: RemoteObject) -> Result<JsonValue> {
+    match remote_object.r#type {
+        RemoteObjectType::Object | RemoteObjectType::Symbol | RemoteObjectType::Function => {
+            if let Some(_) = &remote_object.object_id {
+                let remote_val = JsRemoteVal::from_remote_object(&page, remote_object).await?;
+                return Ok(serde_json::to_value(remote_val)?);
+            }
+        }
+        RemoteObjectType::Undefined => {
+            return Ok(serde_json::to_value(JsUndefined)?)
+        }
+        RemoteObjectType::Bigint => {
+            let bigint = JsBigInt::from_remote_object(&remote_object)
+                .ok_or(CdpError::UnexpectedValue(format!("Invalid bigint: {:#?}", remote_object)))?;
+            return Ok(serde_json::to_value(bigint)?);
+        }
+        _ => (),
+    }
+    Ok(remote_object.value.unwrap_or_default())
 }

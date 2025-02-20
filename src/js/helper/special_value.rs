@@ -5,7 +5,7 @@ use chromiumoxide_cdp::cdp::{browser_protocol::dom::DescribeNodeParams, js_proto
 use crate::{error::{CdpError, Result}, handler::PageInner};
 use super::*;
 
-pub(crate) const JS_REMOTE_KEY: &str = "$chromiumoxide::js::remote";
+pub(crate) const JS_REMOTE_OBJECT_KEY: &str = "$chromiumoxide::js::remote";
 pub(crate) const JS_BIGINT_KEY: &str = "$chromiumoxide::js::bigint";
 pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
 
@@ -21,14 +21,11 @@ impl SpecialValue {
         if remote_object.object_id.is_some() {
             return Ok(Self::Remote(JsRemoteVal::from_remote_object(page, remote_object).await?));
         }
-        if remote_object.r#type == RemoteObjectType::Bigint {
-            let mut value: String = remote_object.unserializable_value.unwrap().into();
-            assert!(value.ends_with("n"));
-            value.pop();
-            return Ok(Self::BigInt(JsBigInt(value)));
+        if let Some(big_int) = JsBigInt::from_remote_object(&remote_object) {
+            return Ok(Self::BigInt(big_int));
         }
-        if remote_object.r#type == RemoteObjectType::Undefined {
-            return Ok(Self::Undefined(JsUndefined));
+        if let Some(undefined) = JsUndefined::from_remote_object(&remote_object) {
+            return Ok(Self::Undefined(undefined));
         }
         Err(CdpError::UnexpectedValue(format!("Unsupported remote object: {remote_object:?}")))
     }
@@ -210,7 +207,7 @@ impl serde::Serialize for JsRemoteVal {
 
         use serde::ser::SerializeStruct;
         let mut s = serializer.serialize_struct("JsRemoteObject", 1)?;
-        s.serialize_field(JS_REMOTE_KEY, &proxy)?;
+        s.serialize_field(JS_REMOTE_OBJECT_KEY, &proxy)?;
         s.end()
     }
 }
@@ -236,13 +233,13 @@ impl<'de> serde::Deserialize<'de> for JsRemoteVal {
                     type Value = Key;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        formatter.write_str(JS_REMOTE_KEY)
+                        formatter.write_str(JS_REMOTE_OBJECT_KEY)
                     }
                     fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                        if value == JS_REMOTE_KEY {
+                        if value == JS_REMOTE_OBJECT_KEY {
                             Ok(Key)
                         } else {
-                            Err(E::unknown_field(value, &[JS_REMOTE_KEY]))
+                            Err(E::unknown_field(value, &[JS_REMOTE_OBJECT_KEY]))
                         }
                     }   
                 }
@@ -262,13 +259,13 @@ impl<'de> serde::Deserialize<'de> for JsRemoteVal {
                     let val = map.next_value()?;
                     return Ok(val);
                 }
-                Err(A::Error::missing_field(JS_REMOTE_KEY))
+                Err(A::Error::missing_field(JS_REMOTE_OBJECT_KEY))
             }
         }
 
         let proxy = deserializer.deserialize_struct(
             "JsRemoteObject",
-            &[JS_REMOTE_KEY],
+            &[JS_REMOTE_OBJECT_KEY],
             Visitor
         )?;
         Ok(Self {
@@ -294,7 +291,7 @@ impl schemars::JsonSchema for JsRemoteVal {
         let schema = schemars::json_schema!({
             "type": "object",
             "properties": {
-                JS_REMOTE_KEY: {
+                JS_REMOTE_OBJECT_KEY: {
                     "type": "object",
                     "properties": {
                         "id": { "type": "string" },
@@ -332,7 +329,7 @@ impl schemars::JsonSchema for JsRemoteVal {
                     "required": ["id", "type"],
                 }
             },
-            "required": [JS_REMOTE_KEY],
+            "required": [JS_REMOTE_OBJECT_KEY],
         });
         schema
     }

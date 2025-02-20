@@ -572,8 +572,7 @@
                 return path.map(p => typeof p === 'number' ? `[${p}]` : `['${p}']`).join('');
             }
 
-            return (function (value) {
-                let schema = this;
+            return (function (schema, value) {
                 let result = validateSchemaAndCollectSpecials(value, schema, []);
                 if (result.error) {
                     let { path, value, message } = result.error;
@@ -606,13 +605,13 @@
                         throw new Error('encountered non-object container type for special value', { cause: value });
                     };
 
-                    const replaceSpecialValues = () => {
+                    const replaceSpecialValues = (inputValue) => {
                         const replacedPaths = new Set();
                         if (paths[0].length === 0) {
                             // the root value is a special value
                             return {};
                         }
-                        const replacedValue = cloneValue(value);
+                        const replacedValue = cloneValue(inputValue);
                         const replaceByPath = (path) => {
                             let prefixPath = [];
                             let parentValue = replacedValue;
@@ -645,13 +644,27 @@
             });
         })();
 
+        function processResult(result) {
+            let config = this;
+            if (config.returnMode === 'null') {
+                return null;
+            } else if (config.returnMode === 'undefined') {
+                return undefined;
+            } else if (config.returnMode === 'byValue' || config.returnMode === 'byId') {
+                return result;
+            } else if (config.returnMode === 'complex') {
+                return splitSpecials(config.schema, result);
+            } else {
+                throw new Error(`invalid config: unknown return mode ${config.returnMode}`);
+            }
+        };
+
         v.mergeSpecials = mergeSpecials;
-        v.splitSpecials = splitSpecials;
+        v.processResult = processResult;
     })($chromiumoxideEvaluatorArguments$);
 
     $chromiumoxideEvaluatorArguments$ = ((v) => ({
-        resultSchema: v.shift(),
-        awaitPromise: v.shift(),
+        config: v.shift(),
         thisDescriptor: v[0],
         thisSpecials: (() => {
             let descriptor = v.shift();
@@ -668,7 +681,7 @@
             }
         })(),
         mergeSpecials: v.mergeSpecials,
-        splitSpecials: v.splitSpecials,
+        processResult: v.processResult,
     }))($chromiumoxideEvaluatorArguments$);
 
     $chromiumoxideEvaluatorArguments$.thisExprValues = (
@@ -701,11 +714,11 @@
         $chromiumoxideEvaluatorArguments$.args = [];
     }
 
-    let { resultSchema, awaitPromise, splitSpecials, func, args } = $chromiumoxideEvaluatorArguments$;
+    let { config, processResult, func, args } = $chromiumoxideEvaluatorArguments$;
     const result = func.call(...args);
-    if (awaitPromise) {
-        return Promise.resolve(result).then(splitSpecials.bind(resultSchema));
+    if (config.awaitPromise) {
+        return Promise.resolve(result).then(processResult.bind(config));
     } else {
-        return splitSpecials.call(resultSchema, result);
+        return processResult.call(config, result);
     }
 }

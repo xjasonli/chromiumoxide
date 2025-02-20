@@ -289,17 +289,364 @@ js_remote_object!(
         static #subtype: "none";
         static #class: "Window";
 
+        /*
         properties: {
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/caches
+            caches: JsCacheStorage [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/closed
+            closed: bool [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/cookieStore
+            cookieStore: JsCookieStore [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/credentialless
+            credentialless: bool [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated
+            crossOriginIsolated: bool [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/crypto
+            crypto: JsCrypto [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/customElements
+            customElements: JsCustomElementRegistry [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio
+            devicePixelRatio: f64 [readonly];
+
             /// https://developer.mozilla.org/en-US/docs/Web/API/Window/document
             document: JsDocument [readonly];
 
-            // todo
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/documentPictureInPicture
+            documentPictureInPicture: JsDocumentPictureInPicture [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/fence
+            fence: JsFenceObject [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/frameElement
+            frameElement: Option<JsElement> [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/frames
+            frames: JsWindow [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/history
+            history: JsHistory [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/indexedDB
+            indexedDB: JsIDBFactory [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/innerHeight
+            innerHeight: u32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/innerWidth
+            innerWidth: u32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/isSecureContext
+            isSecureContext: bool [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/launchQueue
+            launchQueue: JsLaunchQueue [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/length
+            length: u32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+            localStorage: JsStorage [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/location
+            location: JsLocation;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/locationbar
+            locationbar: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/menubar
+            menubar: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/name
+            name: String;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/navigation
+            navigation: JsNavigation [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/navigator
+            navigator: JsNavigator [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/opener
+            opener: Option<JsWindow>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/origin
+            origin: String [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/originAgentCluster
+            originAgentCluster: bool [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/outerHeight
+            outerHeight: u32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/outerWidth
+            outerWidth: u32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/parent
+            parent: JsWindow [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/performance
+            performance: JsPerformance [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/personalbar
+            personalbar: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scheduler
+            scheduler: JsScheduler [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/screen
+            screen: JsScreen [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/screenLeft
+            screenLeft: i32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/screenTop
+            screenTop: i32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/screenX
+            screenX: i32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/screenY
+            screenY: i32 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollbars
+            scrollbars: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollX
+            scrollX: f64 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollY
+            scrollY: f64 [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/self
+            self: JsWindow [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage
+            sessionStorage: JsStorage [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/sharedStorage
+            sharedStorage: JsSharedStorage [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/speechSynthesis
+            speechSynthesis: JsSpeechSynthesis [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/statusbar
+            statusbar: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/toolbar
+            toolbar: JsBarProp [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/top
+            top: JsWindow [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/trustedTypes
+            trustedTypes: JsTrustedTypePolicyFactory [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/visualViewport
+            visualViewport: JsVisualViewport [readonly];
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/window
+            window: JsWindow [readonly];
         }
+
         methods: {
-            // todo
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/alert
+            alert(message: Option<String>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/atob
+            atob(data: String) -> String;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa
+            btoa(data: String) -> String;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/cancelAnimationFrame
+            cancelAnimationFrame(handle: u32) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/cancelIdleCallback
+            cancelIdleCallback(handle: u32) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/clearInterval
+            clearInterval(handle: Option<i32>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/clearTimeout
+            clearTimeout(handle: Option<i32>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/close
+            close() -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/confirm
+            confirm(message: Option<String>) -> bool;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/createImageBitmap
+            createImageBitmap(image: JsImageBitmapSource) -> JsPromise<JsImageBitmap>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch
+            fetch(input: AnyOf2<String, JsRequest>) -> JsPromise<JsResponse>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/focus
+            focus() -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle
+            getComputedStyle(element: &JsElement) -> JsCssStyleDeclaration;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle
+            #[rename = + withPseudoElement]
+            getComputedStyle(element: &JsElement, pseudo_element: Option<String>) -> JsCssStyleDeclaration;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/getScreenDetails
+            getScreenDetails() -> JsPromise<JsScreenDetails>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/getSelection
+            getSelection() -> Option<JsSelection>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/matchMedia
+            matchMedia(query: String) -> JsMediaQueryList;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/moveBy
+            moveBy(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/moveTo
+            moveTo(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/open
+            open(url: Option<String>, target: Option<String>, features: Option<String>) -> Option<JsWindow>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+            postMessage<T: IntoJs>(message: T, target_origin: String, transfer: Option<Vec<JsTransferable>>) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/print
+            print() -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/prompt
+            prompt(message: Option<String>, default: Option<String>) -> Option<String>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/queryLocalFonts
+            queryLocalFonts() -> JsPromise<Vec<JsLocalFontAccess>>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask
+            queueMicrotask(callback: &JsFunction) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+            requestAnimationFrame(callback: &JsFunction) -> u32;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback
+            requestIdleCallback(callback: &JsFunction) -> u32;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback
+            #[rename = + withOptions]
+            requestIdleCallback(callback: &JsFunction, options: JsIdleRequestOptions) -> u32;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/resizeBy
+            resizeBy(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/resizeTo
+            resizeTo(width: f64, height: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scroll
+            scroll(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scroll
+            #[rename = + withOptions]
+            scroll(options: JsScrollToOptions) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollBy
+            scrollBy(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollBy
+            #[rename = + withOptions]
+            scrollBy(options: JsScrollToOptions) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollTo
+            scrollTo(x: f64, y: f64) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollTo
+            #[rename = + withOptions]
+            scrollTo(options: JsScrollToOptions) -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/setInterval
+            setInterval(handler: &JsFunction, timeout: Option<i32>) -> i32;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout
+            setTimeout(handler: &JsFunction, timeout: Option<i32>) -> i32;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker
+            showDirectoryPicker(options: Option<JsDirectoryPickerOptions>) -> JsPromise<JsFileSystemDirectoryHandle>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker
+            showOpenFilePicker(options: Option<JsOpenFilePickerOptions>) -> JsPromise<Vec<JsFileSystemFileHandle>>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker
+            showSaveFilePicker(options: Option<JsSaveFilePickerOptions>) -> JsPromise<JsFileSystemFileHandle>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/stop
+            stop() -> ();
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/Window/structuredClone
+            structuredClone<T: IntoJs>(value: T, options: Option<JsStructuredSerializeOptions>) -> T::FromJs;
         }
+        */
     }
 );
+
+js_remote_object!(
+    /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage
+    class CacheStorage extends Object {
+        static #type: "object";
+        static #subtype: "none";
+        static #class: "CacheStorage";
+
+        /*
+        methods: {
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/delete
+            delete(cache_name: impl IntoJs<str>) -> bool;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/has
+            has(cache_name: impl IntoJs<str>) -> bool;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/keys
+            keys() -> Vec<String>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/match
+            #[rename = + byUrl]
+            match(request: impl IntoJs<str>) -> Option<JsResponse>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/match
+            #[rename = + byUrlWithOptions]
+            match(request: impl IntoJs<str>, options: JsCacheQueryOptions) -> Option<JsResponse>;
+
+            /// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/open
+            open(cache_name: String) -> JsPromise<JsCache>;
+        }
+        */
+    }
+);
+
+/// https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/match#options
+/// 
+/// An object whose properties control how matching is done in the match operation. The available options are:
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct JsCacheQueryOptions {
+    /// A boolean value that specifies whether the matching process should ignore the query string in the URL. For example, if set to true, the ?value=bar part of http://foo.com/?value=bar would be ignored when performing a match. It defaults to false.
+    #[serde(default)]
+    ignore_search: bool,
+    
+    /// A boolean value that, when set to true, prevents matching operations from validating the Request http method (normally only GET and HEAD are allowed.) It defaults to false.
+    #[serde(default)]
+    ignore_method: bool,
+
+    /// A boolean value that, when set to true, tells the matching operation not to perform VARY header matching. In other words, if the URL matches you will get a match regardless of whether the Response object has a VARY header or not. It defaults to false.
+    #[serde(default)]
+    ignore_vary: bool,
+
+    /// A string that represents a specific cache to search within.
+    #[serde(default)]
+    cache_name: Option<String>,
+}
 
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/Location

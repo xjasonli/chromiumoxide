@@ -1,3 +1,5 @@
+use chromiumoxide_cdp::cdp::js_protocol::runtime::{RemoteObject, RemoteObjectType};
+
 use super::helper;
 
 #[derive(Debug, Clone)]
@@ -11,8 +13,22 @@ impl JsBigInt {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-}
 
+    pub(crate) fn from_remote_object(remote_object: &RemoteObject) -> Option<Self> {
+        if remote_object.r#type != RemoteObjectType::Bigint {
+            return None;
+        }
+        let value: &str  = remote_object.unserializable_value.as_ref()
+            .map(|v| v.inner().as_str())
+            .unwrap_or_default();
+
+        if !value.ends_with("n") {
+            return None;
+        }
+        let value = &value[.. value.len() - 1];
+        Some(Self(value.to_owned()))
+    }
+}
 
 impl serde::Serialize for JsBigInt {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
-use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallArgument, GetPropertiesParams, ReleaseObjectParams};
+use chromiumoxide_cdp::cdp::js_protocol::runtime::{CallArgument, CallFunctionOnReturns, GetPropertiesParams, ReleaseObjectParams};
 use schemars::Schema;
 
 use crate::handler::PageInner;
@@ -44,28 +44,22 @@ impl<'a> Evaluator<'a> {
             settings.inline_subschemas = true;
             settings.into_generator().into_root_schema_for::<T>()
         };
-        let page = self.page.clone();
-        let (value, execution_context_id) = self.eval_with_schema(schema).await?;
+        let (value, execution_context_id) = evaluate(
+            self.page.clone(),
+            self.target,
+            None,
+            schema,
+            self.options
+        ).await?;
 
         let value = serde::de::DeserializeSeed::deserialize(
             de::JsDeserializeSeed::new(
-                JsRemoteObjectCtx::new(page, execution_context_id),
+                JsRemoteObjectCtx::new(self.page.clone(), execution_context_id),
                 PhantomData,
             ),
             value
         )?;
         Ok(value)
-    }
-
-    pub async fn eval_with_schema(self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
-        let (params, execution_context_id) = self.target.into_params(
-            self.page.clone(),
-            None,
-            schema,
-            self.options
-        ).await?;
-        let value = execute(self.page, params).await?;
-        Ok((value, execution_context_id))
     }
 
     pub fn invoke(self) -> FunctionInvoker<'a> {
@@ -115,10 +109,20 @@ impl<'a> EvalTarget<'a> {
         page: Arc<PageInner>,
         invoke: Option<InvokeParams<'a>>,
         schema: Schema,
+        mode: ReturnMode,
         options: EvalOptions
     ) -> Result<(CallFunctionOnParams, ExecutionContextId)> {
         let mut objects = vec![];
         let mut call_arguments = vec![];
+
+        call_arguments.push(CallArgument::builder()
+            .value(serde_json::to_value(EvaluateConfig {
+                return_mode: mode,
+                await_promise: options.await_promise,
+                schema,
+            })?)
+            .build()
+        );
 
         // extracts the execution context id from the execution context object
         if let Some(execution_context_object) = self.execution_context_object {
@@ -132,14 +136,6 @@ impl<'a> EvalTarget<'a> {
 
         let this_exprs = {
             let this = Argument::new(self.this)?;
-            call_arguments.push(CallArgument::builder()
-                .value(serde_json::to_value(schema)?)
-                .build()
-            );
-            call_arguments.push(CallArgument::builder()
-                .value(serde_json::to_value(options.await_promise)?)
-                .build()
-            );
             call_arguments.push(CallArgument::builder()
                 .value(serde_json::to_value(this.descriptor)?)
                 .build()
@@ -187,12 +183,19 @@ impl<'a> EvalTarget<'a> {
 
         let function = generate_function(&this_exprs, self.expr.as_str(), &args_exprs);
 
+        let return_by_value = match mode {
+            ReturnMode::Null => true,
+            ReturnMode::Undefined => true,
+            ReturnMode::ByValue => true,
+            _ => false,
+        };
+
         let params = CallFunctionOnParams::builder()
             .function_declaration(function)
             .execution_context_id(execution_context_id)
             .await_promise(options.await_promise)
             .user_gesture(options.user_gesture)
-            .return_by_value(false)
+            .return_by_value(return_by_value)
             .arguments(call_arguments)
             .build()
             .expect("build CallFunctionOnParams should be infallible");
@@ -217,14 +220,15 @@ fn generate_function(
             expr
         )
     }
-    let this_exprs = this_exprs.into_iter()
-        .map(|(path, expr)| expr_to_code(path, expr))
-        .collect::<Vec<_>>()
-        .join(",");
-    let args_exprs = args_exprs.into_iter()
-        .map(|(path, expr)| expr_to_code(path, expr))
-        .collect::<Vec<_>>()
-        .join(",");
+    fn exprs_to_code(exprs: &[(JsonPointer, String)]) -> String {
+        exprs.into_iter()
+            .map(|(path, expr)| expr_to_code(path, expr))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    let this_exprs = exprs_to_code(this_exprs);
+    let args_exprs = exprs_to_code(args_exprs);
 
     EVALUATOR.replace("__THIS_EXPRS__", &this_exprs)
         .replace("__EXPR__", expr)
@@ -256,7 +260,101 @@ impl Argument {
     }
 }
 
-pub(crate) async fn execute(page: Arc<PageInner>, params: CallFunctionOnParams) -> Result<JsonValue> {
+#[derive(Debug, Copy, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ReturnMode {
+    // Simple case, only return null
+    //
+    // all other result will be discarded and converted to null
+    // this is a special case of `ByValue`, with pre-process logic in javascript
+    Null,
+
+    // Simple case, only return undefined
+    //
+    // all other result will be discarded and converted to undefined
+    // this is a special case of `ByValue`, with pre-process logic in javascript
+    Undefined,
+
+    // Simple case, return the result by value
+    //
+    // Maybe:
+    // * RemoteObject.type == "object" with RemoteObject.value for json
+    //
+    // * RemoteObject.type == "undefined" for undefined
+    // * RemoteObject.type == "bigint" with RemoteObject.unserializedValue for bigint
+    ByValue,
+
+    // Simple case, return the result by id
+    //
+    // Maybe:
+    // * RemoteObject.type == "object" with RemoteObject.objectId
+    // * RemoteObject.type == "function" with RemoteObject.objectId
+    // * RemoteObject.type == "symbol" with RemoteObject.objectId
+    //
+    // * RemoteObject.type == "undefined" for undefined
+    // * RemoteObject.type == "bigint" with RemoteObject.unserializedValue for bigint
+    ById,
+
+    // return the result as a Descriptor
+    Complex,
+}
+
+impl ReturnMode {
+    fn from_schema(schema: &Schema) -> Self {
+        schema::parse_json_schema(schema)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EvaluateConfig {
+    /// Whether to return a complex value.
+    return_mode: ReturnMode,
+
+    /// Whether to wait for the promise to resolve.
+    await_promise: bool,
+
+    /// The schema to use for the result.
+    schema: Schema,
+}
+
+pub(crate) async fn evaluate<'a>(
+    page: Arc<PageInner>,
+    target: EvalTarget<'a>,
+    invoke: Option<InvokeParams<'a>>,
+    schema: Schema,
+    options: EvalOptions,
+) -> Result<(JsonValue, ExecutionContextId)> {
+    let mode = ReturnMode::from_schema(&schema);
+    let (params, execution_context_id) = target.into_params(
+        page.clone(),
+        invoke,
+        schema,
+        mode,
+        options,
+    ).await?;
+
+    let value = if let ReturnMode::Complex = mode {
+        execute_complex(page, params).await?
+    } else {
+        execute_simple(page, params).await?
+    };
+    Ok((value, execution_context_id))
+}
+
+async fn execute_simple(page: Arc<PageInner>, params: CallFunctionOnParams) -> Result<JsonValue> {
+    let CallFunctionOnReturns {
+        exception_details,
+        result,
+    } = page.execute(params).await?.result;
+
+    if let Some(exception) = exception_details {
+        return Err(CdpError::JavascriptException(Box::new(exception)));
+    }
+    parse_remote_object(page, result).await
+}
+
+async fn execute_complex(page: Arc<PageInner>, params: CallFunctionOnParams) -> Result<JsonValue> {
     let mut guard = RemoteValuesGuard::new(page.clone());
     let resp = page.execute(params).await?.result;
     if let Some(exception) = resp.exception_details {

@@ -1,4 +1,6 @@
 //! Rust representation of JavaScript's `undefined` value.
+use chromiumoxide_cdp::cdp::js_protocol::runtime::{RemoteObject, RemoteObjectType};
+
 use super::helper;
 
 /// Represents JavaScript's `undefined` value.
@@ -91,5 +93,14 @@ impl schemars::JsonSchema for JsUndefined {
             "required": [helper::JS_UNDEFINED_KEY],
         });
         schema
+    }
+}
+
+impl JsUndefined {
+    pub(crate) fn from_remote_object(remote_object: &RemoteObject) -> Option<Self> {
+        if remote_object.r#type != RemoteObjectType::Undefined {
+            return None;
+        }
+        Some(Self)
     }
 }

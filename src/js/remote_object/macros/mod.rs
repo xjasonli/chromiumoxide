@@ -235,7 +235,7 @@ macro_rules! js_remote_object {
                     #[allow(unused_mut)]
                     let mut properties = parent_schema.ensure_object()
                         ["properties"]
-                        [helper::JS_REMOTE_KEY]
+                        [helper::JS_REMOTE_OBJECT_KEY]
                         ["properties"]
                         .as_object_mut()
                         .unwrap();

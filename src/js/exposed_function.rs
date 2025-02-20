@@ -548,9 +548,13 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
     #[serde(rename_all = "camelCase")]
     #[allow(unused)]
     struct PropertyDescriptor {
+        #[serde(default)]
         configurable: bool,
+        #[serde(default)]
         enumerable: bool,
+        #[serde(default)]
         writable: bool,
+        #[serde(default)]
         value: String,
     }
 
