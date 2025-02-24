@@ -261,7 +261,12 @@ macro_rules! js_remote_object {
                         .as_object_mut()
                         .unwrap();
                     $(
-                        properties["type"]["enum"] = serde_json::json!([$type]);
+                        let r#type = serde_json::json!($type);
+                        if let Some(r#type) = r#type.as_array() {
+                            properties["type"]["enum"] = serde_json::json!(r#type);
+                        } else {
+                            properties["type"]["enum"] = serde_json::json!([r#type]);
+                        }
                     )?
                     $(
                         properties["subtype"] = helper::SubtypePattern::to_schema($subtype);

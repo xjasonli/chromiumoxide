@@ -305,7 +305,7 @@
                                 error: {
                                     value: value,
                                     path: currentPath,
-                                    message: `value type '${valueType}' not in allowed types: ${allowedSpecialTypes.join(', ')}`
+                                    message: `value type '${valueType}' not in allowed types: ${JSON.stringify(allowedSpecialTypes)}`
                                 }
                             };
                         }
