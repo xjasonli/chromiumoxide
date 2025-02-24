@@ -210,8 +210,8 @@ js_remote_object!(
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createProcessingInstruction
             createProcessingInstruction(
-                target: impl IntoJs<str>,
-                data: impl IntoJs<str>,
+                target: impl IntoJs<String>,
+                data: impl IntoJs<String>,
             ) -> JsProcessingInstruction;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createRange
@@ -293,13 +293,13 @@ js_remote_object!(
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector
-            querySelector(selectors: impl IntoJs<str>) -> Option<JsElement>;
+            querySelector(selectors: impl IntoJs<String>) -> Option<JsElement>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll
-            querySelectorAll(selectors: impl IntoJs<str>) -> Vec<JsElement> {
+            querySelectorAll(selectors: impl IntoJs<String>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
@@ -315,23 +315,23 @@ js_remote_object!(
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess
             requestStorageAccess(options?: &JsRequestStorageAccessOptions) -> JsPromise;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccessFor
-            requestStorageAccessFor(origin: impl IntoJs<str>) -> JsPromise;
+            requestStorageAccessFor(origin: impl IntoJs<String>) -> JsPromise;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition
             startViewTransition(callback: Option<&JsFunction>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createExpression
-            createExpression(xpath: impl IntoJs<str>) -> JsObject;
+            createExpression(xpath: impl IntoJs<String>) -> JsObject;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate
             evaluate<T: IntoJs<JsNode>>(
-                xpath: impl IntoJs<str>,
+                xpath: impl IntoJs<String>,
                 context_node: T,
                 namespace_resolver: Option<JsFunction>,
                 result_type: JsXpathResultType,
@@ -339,7 +339,7 @@ js_remote_object!(
             ) -> JsObject;
 
             /// Extension method
-            queryXpath(xpath: impl IntoJs<str>) -> Option<JsNode> {
+            queryXpath(xpath: impl IntoJs<String>) -> Option<JsNode> {
                 let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 for (let i = 0; i < result.snapshotLength; i++) {
                     let node = result.snapshotItem(i);
@@ -351,7 +351,7 @@ js_remote_object!(
             }
 
             /// Extension method
-            queryXpathAll(xpath: impl IntoJs<str>) -> Vec<JsNode> {
+            queryXpathAll(xpath: impl IntoJs<String>) -> Vec<JsNode> {
                 let result = this.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 let nodes = [];
                 for (let i = 0; i < result.snapshotLength; i++) {
@@ -366,11 +366,13 @@ js_remote_object!(
     }
 );
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct JsNodeFilter(u32);
+
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(serde::Serialize, serde::Deserialize)]
-    #[serde(transparent)]
-    pub struct JsNodeFilter: u32 {
+    impl JsNodeFilter: u32 {
         const SHOW_ALL = 0xFFFFFFFF;
         const SHOW_ATTRIBUTE = 2;
         const SHOW_CDATA_SECTION = 8;
@@ -387,21 +389,11 @@ bitflags::bitflags! {
     }
 }
 
-impl schemars::JsonSchema for JsNodeFilter {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "JsNodeFilter".into()
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        concat!(module_path!(), "::JsNodeFilter").into()
-    }
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        generator.subschema_for::<u32>()
-    }
-}
-
 /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess#types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsRequestStorageAccessOptions {
     /// A boolean specifying all possible unpartitioned states should be made accessible.
     pub all: Option<bool>,

@@ -15,7 +15,7 @@ js_remote_object!(
             clear() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/delete
-            delete<K: IntoJs>(key: K) -> bool;
+            delete<K: IntoJsAny>(key: K) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/entries
             entries() -> JsIterator;
@@ -28,16 +28,16 @@ js_remote_object!(
             forEach(callback: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/get
-            get<K: IntoJs, V: FromJs>(key: K) -> Optional<V>;
+            get<K: IntoJsAny, V: FromJsAny>(key: K) -> Optional<V>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/has
-            has<K: IntoJs>(key: K) -> bool;
+            has<K: IntoJsAny>(key: K) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/keys
             keys() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/set
-            set<K: IntoJs, V: IntoJs>(key: K, value: V) -> Self;
+            set<K: IntoJsAny, V: IntoJsAny>(key: K, value: V) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/values
             values() -> JsIterator;

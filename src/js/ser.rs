@@ -116,7 +116,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_some(&value)
     }
 
@@ -136,7 +136,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_newtype_struct(name, &value)
     }
 
@@ -144,7 +144,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_newtype_variant(name, variant_index, variant, &value)
     }
 
@@ -206,12 +206,12 @@ where
 }
 
 #[derive(Debug)]
-pub struct JsValueWrapper<T> {
+pub struct JsSerialize<T> {
     inner: T,
     ctx: Ctx,
 }
 
-impl<T> serde::ser::Serialize for JsValueWrapper<T>
+impl<T> serde::ser::Serialize for JsSerialize<T>
 where
     T: serde::ser::Serialize,
 {
@@ -238,7 +238,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_element(&value)
     }
 
@@ -264,7 +264,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_element(&value)
     }
 
@@ -291,7 +291,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_field(&value)
     }
 
@@ -317,7 +317,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_field(&value)
     }
 
@@ -343,7 +343,7 @@ where
     where
         V: serde::Serialize,
     {
-        let key = JsValueWrapper { inner: key, ctx: self.ctx.clone() };
+        let key = JsSerialize { inner: key, ctx: self.ctx.clone() };
         self.inner.serialize_key(&key)
     }
 
@@ -351,7 +351,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_value(&value)
     }
 
@@ -377,7 +377,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_field(key, &value)
     }
 
@@ -403,7 +403,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsValueWrapper { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
         self.inner.serialize_field(key, &value)
     }
 

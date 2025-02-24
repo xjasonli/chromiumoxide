@@ -406,7 +406,7 @@ impl PageInner {
         Ok(utils::base64::decode(&res.data)?)
     }
 
-    pub async fn eval_global<'a, R: js::FromJs>(
+    pub async fn eval_global<'a, R: js::FromJsAny>(
         self: &Arc<Self>,
         params: impl Into<js::GlobalEvalParams<'a>>,
     ) -> Result<R> {
@@ -419,7 +419,7 @@ impl PageInner {
         ).await
     }
 
-    pub async fn eval<'a, T: js::FromJs>(
+    pub async fn eval<'a, T: js::FromJsAny>(
         self: &Arc<Self>,
         params: impl Into<js::ScopedEvalParams<'a>>,
     ) -> Result<T> {
@@ -428,7 +428,6 @@ impl PageInner {
             self.clone(),
             params.expr,
             params.execution_context_id,
-            params.execution_context_object,
             params.this,
             params.options
         );
@@ -444,7 +443,6 @@ impl PageInner {
             self.clone(),
             params.expr,
             params.execution_context_id,
-            params.execution_context_object,
             params.this,
             params.options
         );
@@ -460,7 +458,7 @@ impl PageInner {
         F: js::ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: js::ExposableFnError + 'f,
-        R: js::IntoJs + 'f,
+        R: js::IntoJsAny + 'f,
         for<'a> A: js::FromJsArgs + 'a,
     {
         js::ExposedFunction::new(

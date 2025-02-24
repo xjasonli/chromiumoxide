@@ -11,13 +11,13 @@ js_remote_object!(
 
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/at
-            at<T: FromJs>(index: usize) -> T;
+            at<T: FromJsAny>(index: usize) -> T;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/concat
             concat<I, T>(...values: I) -> Self
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs;
+                T: IntoJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/copyWithin
             copyWithin(target: usize, start: usize, end?: usize) -> Self;
@@ -33,7 +33,7 @@ js_remote_object!(
             every(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fill
-            fill<T: IntoJs>(value: T, start?: usize, end?: usize) -> Self;
+            fill<T: IntoJsAny>(value: T, start?: usize, end?: usize) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter
             filter(callback_fn: impl IntoJs<JsFunction>) -> Self;
@@ -43,11 +43,11 @@ js_remote_object!(
             filter(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
-            find<T: FromJs>(callback_fn: impl IntoJs<JsFunction>) -> Option<T>;
+            find<T: FromJsAny>(callback_fn: impl IntoJs<JsFunction>) -> Option<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
             #[rename = + withThis]
-            find<T: FromJs>(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Option<T>;
+            find<T: FromJsAny>(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Option<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findIndex
             findIndex(callback_fn: impl IntoJs<JsFunction>) -> isize;
@@ -57,11 +57,11 @@ js_remote_object!(
             findIndex(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> isize;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLast
-            findLast<T: FromJs>(callback_fn: impl IntoJs<JsFunction>) -> Option<T>;
+            findLast<T: FromJsAny>(callback_fn: impl IntoJs<JsFunction>) -> Option<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLast
             #[rename = + withThis]
-            findLast<T: FromJs>(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Option<T>;
+            findLast<T: FromJsAny>(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Option<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLastIndex
             findLastIndex(callback_fn: impl IntoJs<JsFunction>) -> isize;
@@ -88,10 +88,10 @@ js_remote_object!(
             forEach(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/includes
-            includes<T: IntoJs>(search_element: T, from_index?: isize) -> bool;
+            includes<T: IntoJsAny>(search_element: T, from_index?: isize) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf
-            indexOf<T: IntoJs>(search_element: T, from_index?: isize) -> isize;
+            indexOf<T: IntoJsAny>(search_element: T, from_index?: isize) -> isize;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join
             join(separator?: &str) -> String;
@@ -100,7 +100,7 @@ js_remote_object!(
             keys() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/lastIndexOf
-            lastIndexOf<T: IntoJs>(search_element: T, from_index?: isize) -> isize;
+            lastIndexOf<T: IntoJsAny>(search_element: T, from_index?: isize) -> isize;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map
             map(callback_fn: impl IntoJs<JsFunction>) -> Self;
@@ -110,13 +110,13 @@ js_remote_object!(
             map(callback_fn: impl IntoJs<JsFunction>, this_arg: impl IntoJs<JsRemoteObject>) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/pop
-            pop<T: FromJs>() -> T;
+            pop<T: FromJsAny>() -> T;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push
             push<I, T>(...elements: I) -> usize
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs;
+                T: IntoJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce
             reduce(callback_fn: impl IntoJs<JsFunction>) -> Self;
@@ -136,7 +136,7 @@ js_remote_object!(
             reverse() -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/shift
-            shift<T: FromJs>() -> Option<T>;
+            shift<T: FromJsAny>() -> Option<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/slice
             slice(start?: usize, end?: usize) -> Self;
@@ -163,14 +163,14 @@ js_remote_object!(
             splice<I, T>(start: usize, delete_count?: usize, ...items: I) -> Self
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs;
+                T: IntoJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toLocaleString
             toLocaleString() -> String;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toLocaleString
             #[rename = + withLocales]
-            toLocaleString(locales: impl IntoJs<str>) -> String;
+            toLocaleString(locales: impl IntoJs<String>) -> String;
 
             ///#[overload = + withLocaleAndOptions]
             ///toLocaleString(locales: &str, options: JsToLocaleStringOptions) -> String;
@@ -193,22 +193,22 @@ js_remote_object!(
             toSpliced<I, T>(start: usize, delete_count?: usize, ...items: I) -> Self
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs;
+                T: IntoJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/unshift
             unshift<I, T>(...elements: I) -> usize
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs;
+                T: IntoJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values
             values() -> JsIterator;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/with
-            with<T: IntoJs>(index: isize, value: T) -> Self;
+            with<T: IntoJsAny>(index: isize, value: T) -> Self;
 
             /// Extension method
-            toVec<T: FromJs>() -> Vec<T> {
+            toVec<T: FromJsAny>() -> Vec<T> {
                 return this;
             }
         }

@@ -115,15 +115,7 @@ impl<'a, 'de> serde::Deserialize<'de> for JsExpr<'a> {
     }
 }
 
-// implement IntoJs<AnyType> for JsExpr<'a>
-impl<'a> IntoJs<str> for JsExpr<'a> {
-    type FromJs = String;
-}
-
-impl<'a> IntoJs<JsRemoteObject> for JsExpr<'a> {
-    type FromJs = JsRemoteObject;
-}
-
-impl<'a> IntoJs<JsFunction> for JsExpr<'a> {
-    type FromJs = JsFunction;
+// implement JsExpr for any JsValue
+impl<'a, T: IntoJs<T> + FromJsAny> IntoJs<T> for JsExpr<'a> {
+    type FromJs = T::FromJs;
 }

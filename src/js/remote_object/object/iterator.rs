@@ -8,7 +8,7 @@ js_remote_object!(
 
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#next
-            next<T: FromJs>() -> JsIteratorResult<T>;
+            next<T: FromJsAny>() -> JsIteratorResult<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/drop
             drop(limit: u32) -> Self;
@@ -20,7 +20,7 @@ js_remote_object!(
             filter(callback: impl IntoJs<JsFunction>) -> Self;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/find
-            find<T: FromJs>(callback: impl IntoJs<JsFunction>) -> Optional<T>;
+            find<T: FromJsAny>(callback: impl IntoJs<JsFunction>) -> Optional<T>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/flatMap
             flatMap(callback: impl IntoJs<JsFunction>) -> Self;
@@ -34,7 +34,7 @@ js_remote_object!(
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/reduce
             reduce<T>(callback: impl IntoJs<JsFunction>, initial_value?: T) -> Optional<T>
             where
-                T: IntoJs + FromJs;
+                T: IntoJsAny + FromJsAny;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/some
             some(callback: impl IntoJs<JsFunction>) -> bool;
@@ -46,7 +46,7 @@ js_remote_object!(
             toArray() -> JsArray;
 
             /// Extension method
-            toVec<T: FromJs>() -> Vec<T> {
+            toVec<T: FromJsAny>() -> Vec<T> {
                 return this.toArray();
             }
         }
@@ -56,7 +56,17 @@ js_remote_object!(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsIteratorResult<T> {
     pub value: Optional<T>,
     pub done: Optional<bool>,
+}
+impl<T> Default for JsIteratorResult<T> {
+    fn default() -> Self {
+        Self {
+            value: Default::default(),
+            done: Default::default(),
+        }
+    }
 }

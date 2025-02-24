@@ -5,7 +5,7 @@
 use std::{ops::Deref, sync::Arc};
 use serde::de::Error as _;
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{ReleaseObjectParams, RemoteObjectId};
-use crate::{error::Result, handler::PageInner, js::de::JsDeserializer, Page};
+use crate::{error::Result, handler::PageInner, Page};
 use super::*;
 
 mod macros;
@@ -108,13 +108,13 @@ impl JsRemoteObject {
     /// # use chromiumoxide::js::JsRemoteObject;
     /// # use chromiumoxide::js::JsElement;
     /// # fn example(obj: JsRemoteObject) {
-    /// if obj.is_instance_of::<JsElement>() {
+    /// if obj.instance_of::<JsElement>() {
     ///     // This object is an HTML element
     /// }
     /// # }
     /// ```
-    pub fn is_instance_of<T: DerivedJs<Self>>(&self) -> bool {
-        T::is_instance(self)
+    pub fn instance_of<T: JsDerived<Self>>(&self) -> bool {
+        T::is_class_instance(self)
     }
 
     /// Attempts to downcast this object to a more specific type.
@@ -133,12 +133,12 @@ impl JsRemoteObject {
     /// }
     /// # }
     /// ```
-    pub fn downcast<T: DerivedJs<Self>>(&self) -> Option<T::FromJs> {
+    pub fn downcast<T: JsDerived<Self>>(&self) -> Option<T::FromJs> {
         T::downcast_from(self.clone())
     }
 
-    pub fn downcast_unchecked<T: DerivedJs<Self>>(&self) -> T::FromJs {
-        T::downcast_from_unchecked(self.clone())
+    pub fn downcast_unchecked<T: JsDerived<Self>>(&self) -> T::FromJs {
+        T::downcast_unchecked_from(self.clone())
     }
 
     /// Evaluates a JavaScript expression in the context of this object.
@@ -162,7 +162,7 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn eval<'a, T: FromJs>(&self, params: impl Into<EvalParams<'a>>) -> Result<T> {
+    pub async fn eval<'a, T: FromJsAny>(&self, params: impl Into<EvalParams<'a>>) -> Result<T> {
         let params: ScopedEvalParams<'a> = params.into().into_scoped().this(self.clone());
         self.ctx().page().eval(params).await
     }
@@ -221,7 +221,7 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_method<'a>(&self, name: impl IntoJs + 'a) -> FunctionInvoker<'a> {
+    pub fn invoke_method<'a>(&self, name: impl IntoJsAny + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (name, ...args) => this[name](...args) ];
         self.invoke_function(FUNCTION)
             .argument(name)
@@ -243,7 +243,7 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_well_known_symbol_method<'a>(&self, symbol: impl IntoJs<str> + 'a) -> FunctionInvoker<'a> {
+    pub fn invoke_well_known_symbol_method<'a>(&self, symbol: impl IntoJs<String> + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol[symbol]](...args) ];
         self.invoke_function(FUNCTION)
             .argument(symbol)
@@ -265,7 +265,7 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn invoke_symbol_method_for<'a>(&self, symbol: impl IntoJs<str> + 'a) -> FunctionInvoker<'a> {
+    pub fn invoke_symbol_method_for<'a>(&self, symbol: impl IntoJs<String> + 'a) -> FunctionInvoker<'a> {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, ...args) => this[Symbol.for(symbol)](...args) ];
         self.invoke_function(FUNCTION)
             .argument(symbol)
@@ -304,9 +304,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_property<T>(&self, name: impl IntoJs) -> Result<T>
+    pub async fn get_property<T>(&self, name: impl IntoJsAny) -> Result<T>
     where
-        T: FromJs,
+        T: FromJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![(name) => this[name]];
         self.invoke_function(FUNCTION)
@@ -328,9 +328,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_well_known_symbol_property<T>(&self, symbol: impl IntoJs<str>) -> Result<T>
+    pub async fn get_well_known_symbol_property<T>(&self, symbol: impl IntoJs<String>) -> Result<T>
     where
-        T: FromJs,
+        T: FromJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol) => this[Symbol[symbol]] ];
         self.invoke_function(FUNCTION)
@@ -352,9 +352,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_symbol_property_for<T>(&self, symbol: impl IntoJs<str>) -> Result<T>
+    pub async fn get_symbol_property_for<T>(&self, symbol: impl IntoJs<String>) -> Result<T>
     where
-        T: FromJs,
+        T: FromJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (name) => this[Symbol.for(name)] ];
         self.invoke_function(FUNCTION)
@@ -379,9 +379,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_property<T>(&self, name: impl IntoJs, value: T) -> Result<()>
+    pub async fn set_property<T>(&self, name: impl IntoJsAny, value: T) -> Result<()>
     where
-        T: IntoJs,
+        T: IntoJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (name, value) => { this[name] = value; } ];
         self.invoke_function(FUNCTION)
@@ -404,9 +404,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_well_known_symbol_property<T>(&self, symbol: impl IntoJs<str>, value: T) -> Result<()>
+    pub async fn set_well_known_symbol_property<T>(&self, symbol: impl IntoJs<String>, value: T) -> Result<()>
     where
-        T: IntoJs,
+        T: IntoJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => { this[Symbol[symbol]] = value; } ];
         self.invoke_function(FUNCTION)
@@ -429,9 +429,9 @@ impl JsRemoteObject {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_symbol_property_for<T>(&self, symbol: impl IntoJs<str>, value: T) -> Result<()>
+    pub async fn set_symbol_property_for<T>(&self, symbol: impl IntoJs<String>, value: T) -> Result<()>
     where
-        T: IntoJs,
+        T: IntoJsAny,
     {
         const FUNCTION: JsExpr<'static> = js_expr![ (symbol, value) => { this[Symbol.for(symbol)] = value; } ];
         self.invoke_function(FUNCTION)
@@ -450,6 +450,7 @@ impl JsRemoteObject {
         self.0.ctx.clone()
     }
 
+    #[allow(unused)]
     pub(crate) fn val(&self) -> &helper::JsRemoteVal {
         &self.0.val
     }
@@ -497,19 +498,48 @@ impl schemars::JsonSchema for JsRemoteObject {
 }
 
 impl private::Sealed for JsRemoteObject {}
+
+// implement JsValue<Self> for Self
 impl IntoJs<JsRemoteObject> for JsRemoteObject {
     type FromJs = JsRemoteObject;
 }
-impl<'a> IntoJs<JsRemoteObject> for &'a JsRemoteObject {
-    type FromJs = JsRemoteObject;
+
+impl From<JsRemoteObject> for ExecutionContextId {
+    fn from(value: JsRemoteObject) -> Self {
+        value.execution_context_id()
+    }
 }
-impl<'a> IntoJs<JsRemoteObject> for &'a mut JsRemoteObject {
-    type FromJs = JsRemoteObject;
+impl From<&JsRemoteObject> for ExecutionContextId {
+    fn from(value: &JsRemoteObject) -> Self {
+        value.execution_context_id()
+    }
 }
-impl AsJs<JsRemoteObject> for JsRemoteObject {
-    fn as_js(&self) -> &JsRemoteObject { self }
+impl From<&mut JsRemoteObject> for ExecutionContextId {
+    fn from(value: &mut JsRemoteObject) -> Self {
+        value.execution_context_id()
+    }
 }
 
+/// A trait for types that can be derived from a base type.
+/// 
+/// This trait is implemented for types that can be converted to a JavaScript value
+/// and for which a base type can be derived.
+pub trait JsDerived<BaseT: IntoJsAny + FromJsAny>: IntoJs<BaseT> + private::Sealed {
+    /// Checks whether the given base value is an instance of this type
+    fn is_class_instance(base: &BaseT) -> bool;
+
+    /// Downcasts the given base value to this type without checking
+    fn downcast_unchecked_from(base: BaseT) -> Self::FromJs;
+
+    /// Downcasts the given base value to this type if it is an instance of this type
+    fn downcast_from(base: BaseT) -> Option<Self::FromJs> {
+        if Self::is_class_instance(&base) {
+            Some(Self::downcast_unchecked_from(base))
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct JsRemoteObjectCtx {
@@ -575,7 +605,7 @@ impl serde::Serialize for JsRemoteObjectInner {
 impl<'de> serde::Deserialize<'de> for JsRemoteObjectInner {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(JsRemoteObjectInner {
-            ctx: JsDeserializer::try_get(&deserializer)?,
+            ctx: de::try_get_ctx(&deserializer)?,
             val: helper::JsRemoteVal::deserialize(deserializer)?,
         })
     }
@@ -659,7 +689,7 @@ pub enum JsObjectSubtype {
     /// A JavaScript object that is not categorized into any specific subtype by CDP.
     /// This includes complex objects like window, Location, History, and other objects
     /// that don't fall into CDP's predefined subtypes.
-    None,
+    Other,
 
     /// A JavaScript Array object
     Array,
@@ -728,7 +758,7 @@ pub enum JsObjectSubtype {
 impl JsObjectSubtype {
     pub fn name(&self) -> &'static str {
         match self {
-            Self::None => "none",
+            Self::Other => "other",
             Self::Array => "array",
             Self::Node { .. } => "node",
             Self::RegExp => "regexp",
@@ -750,7 +780,7 @@ impl JsObjectSubtype {
         }
     }
     pub fn is_none(&self) -> bool {
-        matches!(self, JsObjectSubtype::None)
+        matches!(self, JsObjectSubtype::Other)
     }
     pub fn is_array(&self) -> bool {
         matches!(self, JsObjectSubtype::Array)
@@ -810,3 +840,11 @@ impl JsObjectSubtype {
 
 
 unsafe impl try_specialize::LifetimeFree for JsRemoteObject {}
+
+mod private {
+    #![allow(unused)]
+
+    pub trait Sealed {}
+    impl<'a, T: ?Sized + Sealed> Sealed for &'a T {}
+    impl<'a, T: ?Sized + Sealed> Sealed for &'a mut T {}
+}

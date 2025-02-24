@@ -8,16 +8,20 @@ use crate::error::{CdpError, Result};
 
 use super::*;
 
-mod special_value;
+mod remote_val;
 mod evaluator;
 mod global;
 mod patterns;
 mod schema;
 
-pub(crate) use special_value::*;
+pub(crate) use remote_val::*;
 pub(crate) use evaluator::*;
 pub(crate) use global::*;
 pub(crate) use patterns::*;
+
+pub(crate) const JS_REMOTE_OBJECT_KEY: &str = "$chromiumoxide::js::remote";
+pub(crate) const JS_BIGINT_KEY: &str = "$chromiumoxide::js::bigint";
+pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
 
 type JsonObject = serde_json::Map<String, JsonValue>;
 
@@ -64,7 +68,13 @@ impl From<&str> for JsonPointerSegment {
     }
 }
 
-/// A descriptor of a JSON object with special values.
+/// A descriptor of a JSON object with remote object paths.
+/// 
+/// This struct is used to describe a JSON object with remote object paths.
+/// 
+/// The `value` is the JSON value.
+/// 
+/// The `paths` is the paths of the remote objects.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ValueDescriptor {
@@ -72,14 +82,14 @@ pub(crate) struct ValueDescriptor {
     #[serde(default)]
     pub value: JsonValue,
 
-    // The paths of the special values.
+    // The paths of the remote object values.
     #[serde(default)]
     pub paths: Vec<JsonPointer>,
 }
 
 impl ValueDescriptor {
     #[allow(dead_code)]
-    pub fn parse(json: JsonValue) -> (Self, Vec<SpecialValue>) {
+    pub fn parse(json: JsonValue) -> (Self, Vec<JsRemoteVal>) {
         Self::parse_with_expr(json, &mut vec![], &[])
     }
 
@@ -87,19 +97,19 @@ impl ValueDescriptor {
         mut json: JsonValue,
         exprs: &mut Vec<(JsonPointer, String)>,
         expr_prefix: JsonPointerRef<'_>,
-    ) -> (Self, Vec<SpecialValue>) {
-        let (paths, specials) = utils::split_from_json(&mut json, exprs, expr_prefix);
+    ) -> (Self, Vec<JsRemoteVal>) {
+        let (paths, values) = utils::split_from_json(&mut json, exprs, expr_prefix);
         (
             Self {
                 value: json,
                 paths,
             },
-            specials,
+            values,
         )
     }
 
-    pub fn merge(mut self, specials: Vec<SpecialValue>) -> crate::error::Result<JsonValue> {
-        utils::merge_into_json(&mut self.value, self.paths, specials)?;
+    pub fn merge(mut self, values: Vec<JsRemoteVal>) -> crate::error::Result<JsonValue> {
+        utils::merge_into_json(&mut self.value, self.paths, values)?;
         Ok(self.value)
     }
 }
@@ -107,16 +117,17 @@ impl ValueDescriptor {
 mod utils {
     use super::*;
 
+    /// Split `JsExpr` and `JsRemoteObject` out of the json value
     pub(super) fn split_from_json(
         json: &mut JsonValue,
         exprs: &mut Vec<(JsonPointer, String)>,
         expr_prefix: JsonPointerRef<'_>,
-    ) -> (Vec<JsonPointer>, Vec<SpecialValue>) {
+    ) -> (Vec<JsonPointer>, Vec<JsRemoteVal>) {
         fn split_impl(
             json: &mut JsonValue,
             current: JsonPointer,
             paths: &mut Vec<JsonPointer>,
-            specials: &mut Vec<SpecialValue>,
+            values: &mut Vec<JsRemoteVal>,
             exprs: &mut Vec<(JsonPointer, String)>,
             expr_prefix: JsonPointerRef<'_>,
         ) {
@@ -127,15 +138,19 @@ mod utils {
                         path.extend(current);
 
                         exprs.push((path, expr.into_inner().into()));
-                    } else if let Some(special) = SpecialValue::from_json(obj) {
+                    } else if let Some(value) = JsRemoteVal::deserialize(&*obj).ok() {
                         paths.push(current);
-                        specials.push(special);
+                        values.push(value);
                         *obj = JsonObject::new();
+                    } else if let Some(_) = JsUndefined::deserialize(&*obj).ok() {
+                        // skipped
+                    } else if let Some(_) = JsBigInt::deserialize(&*obj).ok() {
+                        // skipped
                     } else {
                         for (key, val) in obj.iter_mut() {
                             let mut new_path = current.clone();
                             new_path.push(JsonPointerSegment::Field(key.clone()));
-                            split_impl(val, new_path, paths, specials, exprs, expr_prefix);
+                            split_impl(val, new_path, paths, values, exprs, expr_prefix);
                         }
                     }
                 }
@@ -143,7 +158,7 @@ mod utils {
                     for (idx, val) in arr.iter_mut().enumerate() {
                         let mut new_path = current.clone();
                         new_path.push(JsonPointerSegment::Index(idx));
-                        split_impl(val, new_path, paths, specials, exprs, expr_prefix);
+                        split_impl(val, new_path, paths, values, exprs, expr_prefix);
                     }
                 }
                 _ => (),
@@ -151,23 +166,24 @@ mod utils {
         }
 
         let mut paths = Vec::new();
-        let mut specials = Vec::new();
-        split_impl(json, vec![], &mut paths, &mut specials, exprs, expr_prefix);
-        (paths, specials)
+        let mut values = Vec::new();
+        split_impl(json, vec![], &mut paths, &mut values, exprs, expr_prefix);
+        (paths, values)
     }
 
+    // Merge ``
     pub(super) fn merge_into_json(
         json: &mut JsonValue,
         paths: Vec<JsonPointer>,
-        specials: Vec<SpecialValue>
+        values: Vec<JsRemoteVal>
     ) -> crate::error::Result<()> {
         fn merge_impl(
             json: &mut JsonValue,
             path: JsonPointerRef<'_>,
-            special: SpecialValue
+            value: JsRemoteVal
         ) -> crate::error::Result<()> {
             if path.is_empty() {
-                *json = special.into_json()?;
+                *json = value.serialize(serde_json::value::Serializer)?;
             } else {
                 match &path[0] {
                     JsonPointerSegment::Field(s) => {
@@ -180,7 +196,7 @@ mod utils {
                         }
 
                         let prop = object.get_mut(s).unwrap();
-                        merge_impl(prop, &path[1..], special)?;
+                        merge_impl(prop, &path[1..], value)?;
                     }
                     JsonPointerSegment::Index(n) => {
                         if !json.is_array() {
@@ -193,15 +209,15 @@ mod utils {
                         }
 
                         let item = array.get_mut(*n).unwrap();
-                        merge_impl(item, &path[1..], special)?;
+                        merge_impl(item, &path[1..], value)?;
                     }
                 }
             }
             Ok(())
         }
 
-        for (path, special) in paths.into_iter().zip(specials.into_iter()) {
-            merge_impl(json, &path[..], special)?;
+        for (path, value) in paths.into_iter().zip(values.into_iter()) {
+            merge_impl(json, &path[..], value)?;
         }
         Ok(())
     }

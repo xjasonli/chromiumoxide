@@ -7,7 +7,7 @@ use crate::handler::PageInner;
 
 use super::*;
 
-pub async fn eval_global<'a, R: FromJs>(
+pub async fn eval_global<'a, R: FromJsAny>(
     page: Arc<PageInner>,
     expr: impl Into<JsExpr<'a>>,
     execution_context_id: Option<ExecutionContextId>,
@@ -25,6 +25,7 @@ pub async fn eval_global<'a, R: FromJs>(
         ReturnMode::ByValue => true,
         _ => false,
     };
+
     let execution_context_id = {
         if let Some(execution_context_id) = execution_context_id {
             execution_context_id

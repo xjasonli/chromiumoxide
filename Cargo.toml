@@ -14,7 +14,7 @@ categories = ["web-programming", "api-bindings", "development-tools::testing"]
 
 [dependencies]
 async-tungstenite = "0.28.0"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 async-std = { version = "1", features = [
     "attributes",
     "unstable",
@@ -49,15 +49,12 @@ reqwest = { version = "0.12", default-features = false }
 paste = "1"
 schemars = { version = "1.0.0-alpha.17", features = ["derive"] }
 try-specialize = "0.1"
-async-once-cell = "0.5"
 async-trait = "0.1"
 rand = "0.8"
 async-scoped = { version = "0.9" }
 erased-serde = "0.4"
 serde_repr = "0.1"
-serde-content = "0.1"
-bitflags = { version = "2", features = ["serde"] }
-frunk = "0.4"
+bitflags = { version = "2" }
 wildmatch = "2"
 
 

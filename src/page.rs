@@ -418,19 +418,19 @@ impl Page {
     /// Execute a query selector on the document's node.
     pub async fn query_selector(
         &self,
-        selector: impl Into<String>,
+        selectors: impl js::IntoJs<String>,
     ) -> Result<Option<js::JsElement>> {
         self.get_document().await?
-            .query_selector(&selector.into()).await
+            .query_selector(selectors).await
     }
 
     /// Return all `Element`s in the document that match the given selector
     pub async fn query_selector_all(
         &self,
-        selector: impl Into<String>,
+        selectors: impl js::IntoJs<String>,
     ) -> Result<Vec<js::JsElement>> {
         self.get_document().await?
-            .query_selector_all(&selector.into()).await
+            .query_selector_all(selectors).await
     }
 
     /// Returns the first element in the document which matches the given xpath
@@ -439,19 +439,19 @@ impl Page {
     /// Execute a xpath selector on the document's node.
     pub async fn query_xpath(
         &self,
-        selector: impl Into<String>,
+        xpath: impl js::IntoJs<String>,
     ) -> Result<Option<js::JsNode>> {
         self.get_document().await?
-            .query_xpath(&selector.into()).await
+            .query_xpath(xpath).await
     }
 
     /// Return all `Element`s in the document that match the given xpath selector
     pub async fn query_xpath_all(
         &self,
-        selector: impl Into<String>,
+        xpath: impl js::IntoJs<String>,
     ) -> Result<Vec<js::JsNode>> {
         self.get_document().await?
-            .query_xpath_all(&selector.into()).await
+            .query_xpath_all(xpath).await
     }
 
     /// Describes node given its id
@@ -1274,7 +1274,7 @@ impl Page {
     /// Returns an error if:
     /// * The JavaScript execution fails
     /// * The result cannot be converted to type `T`
-    pub async fn eval<'a, T: js::FromJs>(
+    pub async fn eval<'a, T: js::FromJsAny>(
         &self,
         params: impl Into<js::ScopedEvalParams<'a>>,
     ) -> Result<T> {
@@ -1313,7 +1313,7 @@ impl Page {
     /// Returns an error if:
     /// * The JavaScript execution fails
     /// * The result cannot be converted to type `R`
-    pub async fn eval_global<'a, R: js::FromJs>(
+    pub async fn eval_global<'a, R: js::FromJsAny>(
         &self,
         params: impl Into<js::GlobalEvalParams<'a>>,
     ) -> Result<R> {
@@ -1481,7 +1481,7 @@ impl Page {
         F: js::ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: js::ExposableFnError + 'f,
-        R: js::IntoJs + 'f,
+        R: js::IntoJsAny + 'f,
         for<'a> A: js::FromJsArgs + 'a,
     {
         self.inner.expose_function(name.into(), function).await

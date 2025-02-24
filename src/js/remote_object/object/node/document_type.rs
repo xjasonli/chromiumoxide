@@ -28,7 +28,7 @@ js_remote_object!(
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/before
             before<I, T>(...nodes: I) -> ()
@@ -41,7 +41,7 @@ js_remote_object!(
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentType/remove
             remove() -> ();
@@ -57,7 +57,7 @@ js_remote_object!(
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
         }
     }
 );

@@ -10,26 +10,26 @@ use crate::utils::is_likely_js_function;
 pub(crate) mod helper;
 pub mod ser;
 pub mod de;
-pub mod any;
-pub mod traits;
+pub mod js_any;
+pub mod js_args;
+pub mod into_js;
+pub mod nullable;
+pub mod optional;
 pub mod remote_object;
 pub mod bigint;
-pub mod primitives;
 pub mod expr;
 pub mod function_invoker;
-pub mod optional;
-pub mod undefined;
 pub mod exposed_function;
 
-pub use any::*;
-pub use traits::*;
+pub use js_any::*;
+pub use js_args::*;
+pub use into_js::*;
+pub use nullable::*;
+pub use optional::*;
 pub use remote_object::*;
 pub use bigint::*;
-//pub use primitives::*;
 pub use expr::*;
 pub use function_invoker::*;
-pub use optional::*;
-pub use undefined::*;
 pub use exposed_function::*;
 
 #[derive(Debug, Clone)]
@@ -162,6 +162,16 @@ impl Default for EvalOptions {
     }
 }
 
+/// Configuration options for evaluating JavaScript code.
+///
+/// This struct provides options that control how JavaScript code is executed,
+/// including handling of promises and user gestures.
+/// 
+/// This struct is used to evaluate JavaScript code.
+/// 
+/// The `expr` is the JavaScript expression to evaluate.
+/// 
+/// The `options` are the options for the evaluation.
 #[derive(Debug, Clone)]
 pub struct EvalParams<'a> {
     /// The expression to evaluate
@@ -172,6 +182,10 @@ pub struct EvalParams<'a> {
 }
 
 impl<'a> EvalParams<'a> {
+    /// Creates a new `EvalParams` with default settings.
+    ///
+    /// By default:
+    /// - `options` are the default evaluation options
     pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
         Self { expr: expr.into(), options: EvalOptions::default() }
     }
@@ -181,10 +195,12 @@ impl<'a> EvalParams<'a> {
         Self { options, ..self }
     }
 
+    /// Converts the `EvalParams` into a `GlobalEvalParams`
     pub fn into_global(self) -> GlobalEvalParams<'a> {
         GlobalEvalParams::new(self.expr).options(self.options)
     }
 
+    /// Converts the `EvalParams` into a `ScopedEvalParams`
     pub fn into_scoped(self) -> ScopedEvalParams<'a> {
         ScopedEvalParams::new(self.expr).options(self.options)
     }
@@ -209,18 +225,31 @@ pub struct GlobalEvalParams<'a> {
 }
 
 impl<'a> GlobalEvalParams<'a> {
+    /// Creates a new `GlobalEvalParams` with default settings.
+    ///
+    /// By default:
+    /// - `execution_context_id` is None (global execution context)
+    /// - `options` are the default evaluation options
     pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
         Self { expr: expr.into(), execution_context_id: None, options: EvalOptions::default() }
     }
 
+    /// Sets the options for the evaluation
     pub fn options(self, options: EvalOptions) -> Self {
         Self { options, ..self }
     }
 
+    /// Sets the execution context (identified by an id) for the evaluation
     pub fn execution_context_id<T: Into<ExecutionContextId>>(self, execution_context_id: T) -> Self {
         Self { execution_context_id: Some(execution_context_id.into()), ..self }
     }
 
+    /// Sets the execution context (identified by a remote object) for the evaluation
+    pub fn execution_context_object<T: Into<JsRemoteObject>>(self, execution_context_object: T) -> Self {
+        self.execution_context_id(execution_context_object.into().execution_context_id())
+    }
+
+    /// Converts the `GlobalEvalParams` into a `ScopedEvalParams`
     pub fn into_scoped(self) -> ScopedEvalParams<'a> {
         let scoped = ScopedEvalParams::new(self.expr)
             .options(self.options);
@@ -238,7 +267,19 @@ impl<'a, T: Into<JsExpr<'a>>> From<T> for GlobalEvalParams<'a> {
     }
 }
 
-#[derive(Debug)]
+/// Configuration options for evaluating JavaScript code in a specific execution context.
+///
+/// This struct provides options that control how JavaScript code is executed,
+/// including handling of promises and user gestures.
+/// 
+/// This struct is used to evaluate JavaScript code in a specific execution context.
+/// 
+/// The `execution_context_id` is the id of the execution context to evaluate the code in.
+/// 
+/// The `this` value is the value of the `this` keyword in the evaluated code.
+/// 
+/// The `options` are the options for the evaluation.
+#[derive(Debug, Clone)]
 pub struct ScopedEvalParams<'a> {
     /// The expression to evaluate
     pub expr: JsExpr<'a>,
@@ -249,16 +290,19 @@ pub struct ScopedEvalParams<'a> {
     /// The execution context for the evaluation
     pub execution_context_id: Option<ExecutionContextId>,
 
-    /// The execution context (identified by a remote object) for the evaluation
-    pub execution_context_object: Option<BoxedIntoJs<'a>>,
-
     /// The `this` value for the evaluation
-    pub this: Option<BoxedIntoJs<'a>>,
+    pub this: Option<DynIntoJsAny<'a>>,
 }
 
 impl<'a> ScopedEvalParams<'a> {
+    /// Creates a new `ScopedEvalParams` with default settings.
+    ///
+    /// By default:
+    /// - `this` is None (no `this` value)
+    /// - `execution_context_id` is None (global execution context)
+    /// - `options` are the default evaluation options
     pub fn new(expr: impl Into<JsExpr<'a>>) -> Self {
-        Self { expr: expr.into(), this: None, execution_context_id: None, execution_context_object: None, options: EvalOptions::default() }
+        Self { expr: expr.into(), this: None, execution_context_id: None, options: EvalOptions::default() }
     }
 
     /// Sets the options for the evaluation
@@ -272,13 +316,13 @@ impl<'a> ScopedEvalParams<'a> {
     }
 
     /// Sets the execution context (identified by a remote object) for the evaluation
-    pub fn execution_context_object<T: IntoJs + 'a>(self, context: T) -> Self {
-        Self { execution_context_object: Some(Box::new(context)), ..self }
+    pub fn execution_context_object<T: Into<JsRemoteObject>>(self, execution_context_object: T) -> Self {
+        self.execution_context_id(execution_context_object.into().execution_context_id())
     }
 
     /// Sets the `this` value for the evaluation
-    pub fn this<T: IntoJs + 'a>(self, this: T) -> Self {
-        Self { this: Some(Box::new(this)), ..self }
+    pub fn this<T: IntoJsAny + 'a>(self, this: T) -> Self {
+        Self { this: Some(std::sync::Arc::new(this)), ..self }
     }
 }
 
@@ -286,12 +330,4 @@ impl<'a, T: Into<JsExpr<'a>>> From<T> for ScopedEvalParams<'a> {
     fn from(expr: T) -> Self {
         ScopedEvalParams::new(expr)
     }
-}
-
-mod private {
-    #![allow(unused)]
-
-    pub trait Sealed {}
-    impl<'a, T: ?Sized + Sealed> Sealed for &'a T {}
-    impl<'a, T: ?Sized + Sealed> Sealed for &'a mut T {}
 }

@@ -157,7 +157,9 @@ js_remote_object!(
 );
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#options
-#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Default, Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsFocusOptions {
     /// Prevent the browser from scrolling the document to bring the
     /// newly-focused element into view. A value of false for preventScroll

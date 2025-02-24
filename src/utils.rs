@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
-
-use crate::js::traits::IntoJsArgs;
+use crate::js::IntoJsArgs;
 
 /// Write to file with configured runtime
 pub(crate) async fn write<P: AsRef<Path> + Unpin, C: AsRef<[u8]>>(

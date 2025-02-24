@@ -20,11 +20,11 @@ js_remote_object!(
 );
 
 impl JsPromise {
-    pub fn into_future<T: FromJs>(self) -> impl futures::Future<Output = Result<T>> + Send
+    pub fn into_future<T: FromJsAny>(self) -> impl futures::Future<Output = Result<T>> + Send
     {
         let evaluator = helper::Evaluator::new_object(
             self.ctx().page(),
-            self.clone(),
+            self,
             EvalOptions {
                 await_promise: true,
                 ..Default::default()

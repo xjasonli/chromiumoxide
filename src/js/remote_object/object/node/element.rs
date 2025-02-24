@@ -416,6 +416,8 @@ js_remote_object!(
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API/Keyframe_Formats
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsKeyframe {
     /// The offset of the keyframe specified as a number between 0.0 and 1.0
     /// inclusive or null. This is equivalent to specifying start and end states
@@ -456,6 +458,8 @@ pub struct JsKeyframe {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/getKeyframes#property_value_pairs
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsComputedKeyframe {
     /// The offset of the keyframe specified as a number between 0.0 and 1.0
     /// inclusive or null. This is equivalent to specifying start and end states
@@ -488,6 +492,8 @@ pub struct JsComputedKeyframe {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/KeyframeEffect#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsKeyframeEffectOptions {
     /// The number of milliseconds to delay the start of the animation.
     /// Defaults to 0.
@@ -556,6 +562,8 @@ pub struct JsKeyframeEffectOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/animate#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsAnimateOptions {
     /// A property unique to animate(): A string with which to reference the
     /// animation.
@@ -588,7 +596,9 @@ pub struct JsAnimateOptions {
 }
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow#options
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsAttachShadowOptions {
     /// A string specifying the encapsulation mode for the shadow DOM tree.
     /// This can be one of:
@@ -652,6 +662,8 @@ pub struct JsAttachShadowOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsCheckVisibilityOptions {
     /// true to check if the element content-visibility property has(or
     /// inherits) the value auto, and it is currently skipping its rendering.
@@ -683,6 +695,8 @@ pub struct JsCheckVisibilityOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getHTML#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsGetHTMLOptions {
     /// A boolean value that specifies whether to include serializable shadow
     /// roots. The default value is false.
@@ -697,6 +711,8 @@ pub struct JsGetHTMLOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsRequestFullscreenOptions {
     /// Controls whether or not to show navigation UI while the element is in
     /// fullscreen mode. The default value is "auto", which indicates that the
@@ -726,6 +742,8 @@ pub struct JsRequestFullscreenOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsRequestPointerLockOptions {
     /// Disables OS-level adjustment for mouse acceleration, and accesses raw
     /// mouse input instead. The default value is false; setting it to true
@@ -736,6 +754,8 @@ pub struct JsRequestPointerLockOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll#options
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsScrollOptions {
     /// Specifies the number of pixels along the Y axis to scroll the window
     /// or element.
@@ -764,6 +784,8 @@ pub struct JsScrollOptions {
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#scrollintoviewoptions
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsScrollIntoViewOptions {
     /// Determines whether scrolling is instant or animates smoothly. This
     /// option is a string which must take one of the following values:

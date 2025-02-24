@@ -39,7 +39,7 @@ use crate::utils::evaluation_string;
 use crate::handler::PageInner;
 use crate::page::Page;
 use crate::js::de::JsDeserializeSeed;
-use crate::js::{FromJs, IntoJs, FromJsArgs, ScopedEvalParams, js_expr_str};
+use crate::js::{FromJsAny, IntoJsAny, FromJsArgs, ScopedEvalParams, js_expr_str};
 
 use super::JsRemoteObjectCtx;
 
@@ -148,7 +148,7 @@ impl<'f> ExposedFunction<'f> {
         T: ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: ExposableFnError + 'f,
-        R: IntoJs + 'f,
+        R: IntoJsAny + 'f,
         for<'a> A: FromJsArgs + 'a,
     {
         let inner = ExposedFunctionInner::new(name, page, callback).await?;
@@ -178,7 +178,7 @@ impl<'f> ExposedFunctionInner<'f> {
         F: ExposableFn<M, E, R, A> + 'f,
         M: 'f,
         E: ExposableFnError + 'f,
-        R: IntoJs + 'f,
+        R: IntoJsAny + 'f,
         for<'a> A: FromJsArgs + 'a,
     {
         // Ensure the CDP binding is available
@@ -436,8 +436,8 @@ macro_rules! impl_exposable_fn {
             where
                 F: (Fn($($ty,)*) -> Result<R, E>) + Send + Sync + 'f,
                 E: ExposableFnError + 'f,
-                R: IntoJs + 'f,
-                $( for<'a> $ty: FromJs + 'a,)*
+                R: IntoJsAny + 'f,
+                $( for<'a> $ty: FromJsAny + 'a,)*
             {
                 async fn invoke_from_javascript(&self, page: Page, execution_context: ExecutionContextId, args: Vec<JsonValue>) -> Result<JsonValue, String> {
                     let ctx = JsRemoteObjectCtx::new(page.into(), execution_context);
@@ -489,8 +489,8 @@ macro_rules! impl_exposable_fn_async {
                 F: (Fn($($ty,)*) -> Fut) + Send + Sync + 'f,
                 Fut: futures::Future<Output = Result<R, E>> + Send + 'f,
                 E: ExposableFnError + 'f,
-                R: IntoJs + 'f,
-                $( for<'a> $ty: FromJs + 'a,)*
+                R: IntoJsAny + 'f,
+                $( for<'a> $ty: FromJsAny + 'a,)*
             {
                 async fn invoke_from_javascript(&self, page: Page, execution_context: ExecutionContextId, args: Vec<JsonValue>) -> Result<JsonValue, String> {
                     let ctx = JsRemoteObjectCtx::new(page.into(), execution_context);

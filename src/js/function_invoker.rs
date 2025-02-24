@@ -48,7 +48,7 @@ impl<'a> FunctionInvoker<'a> {
         Self { page, target, params: InvokeParams::new(), options }
     }
 
-    pub fn this<T: IntoJs + 'a>(mut self, this: T) -> Self {
+    pub fn this<T: IntoJsAny + 'a>(mut self, this: T) -> Self {
         self.params.this(this);
         self
     }
@@ -62,7 +62,7 @@ impl<'a> FunctionInvoker<'a> {
     /// 
     /// # Returns
     /// Returns self for method chaining
-    pub fn argument<T: IntoJs + 'a>(mut self, argument: T) -> Self {
+    pub fn argument<T: IntoJsAny + 'a>(mut self, argument: T) -> Self {
         self.params.argument(argument);
         self
     }
@@ -114,7 +114,7 @@ impl<'a> FunctionInvoker<'a> {
     pub fn arguments_spread<I, T>(mut self, arguments: I) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: IntoJs + 'a,
+        T: IntoJsAny + 'a,
     {
         self.params.arguments_spread(arguments);
         self
@@ -132,7 +132,7 @@ impl<'a> FunctionInvoker<'a> {
     /// Returns the function's return value converted to type `T`
     pub async fn invoke<T>(self) -> Result<T>
     where
-        T: FromJs,
+        T: FromJsAny,
     {
         let schema = {
             let mut settings = schemars::generate::SchemaSettings::default();
@@ -166,21 +166,21 @@ impl<'a> FunctionInvoker<'a> {
 #[derive(Debug, Default)]
 #[derive(serde::Serialize)]
 #[serde(transparent)]
-pub(crate) struct InvokeParams<'a>(Vec<BoxedIntoJs<'a>>);
+pub(crate) struct InvokeParams<'a>(Vec<DynIntoJsAny<'a>>);
 
 impl<'a> InvokeParams<'a> {
     /// Creates a new parameter set.
     pub fn new() -> Self {
-        Self(vec![Box::new(())])
+        Self(vec![std::sync::Arc::new(())])
     }
 
-    pub fn this<T: IntoJs + 'a>(&mut self, this: T) {
-        self.0[0] = Box::new(this);
+    pub fn this<T: IntoJsAny + 'a>(&mut self, this: T) {
+        self.0[0] = std::sync::Arc::new(this);
     }
 
     /// Adds a single argument value.
-    pub fn argument<T: IntoJs + 'a>(&mut self, value: T) {
-        self.0.push(Box::new(value));
+    pub fn argument<T: IntoJsAny + 'a>(&mut self, value: T) {
+        self.0.push(std::sync::Arc::new(value));
     }
 
     /// Adds multiple arguments from a tuple.
@@ -195,10 +195,10 @@ impl<'a> InvokeParams<'a> {
     pub fn arguments_spread<I, T>(&mut self, arguments: I)
     where
         I: IntoIterator<Item = T>,
-        T: IntoJs + 'a,
+        T: IntoJsAny + 'a,
     {
         self.0.extend(
-            arguments.into_iter().map(|arg| -> BoxedIntoJs<'a> { Box::new(arg) })
+            arguments.into_iter().map(|arg| -> DynIntoJsAny<'a> { std::sync::Arc::new(arg) })
         );
     }
 }

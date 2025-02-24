@@ -5,106 +5,6 @@ use chromiumoxide_cdp::cdp::{browser_protocol::dom::DescribeNodeParams, js_proto
 use crate::{error::{CdpError, Result}, handler::PageInner};
 use super::*;
 
-pub(crate) const JS_REMOTE_OBJECT_KEY: &str = "$chromiumoxide::js::remote";
-pub(crate) const JS_BIGINT_KEY: &str = "$chromiumoxide::js::bigint";
-pub(crate) const JS_UNDEFINED_KEY: &str = "$chromiumoxide::js::undefined";
-
-#[derive(Debug, Clone)]
-pub(crate) enum SpecialValue {
-    Remote(JsRemoteVal),
-    BigInt(JsBigInt),
-    Undefined(JsUndefined),
-}
-
-impl SpecialValue {
-    pub async fn from_remote_object(page: &Arc<PageInner>, remote_object: RemoteObject) -> Result<Self> {
-        if remote_object.object_id.is_some() {
-            return Ok(Self::Remote(JsRemoteVal::from_remote_object(page, remote_object).await?));
-        }
-        if let Some(big_int) = JsBigInt::from_remote_object(&remote_object) {
-            return Ok(Self::BigInt(big_int));
-        }
-        if let Some(undefined) = JsUndefined::from_remote_object(&remote_object) {
-            return Ok(Self::Undefined(undefined));
-        }
-        Err(CdpError::UnexpectedValue(format!("Unsupported remote object: {remote_object:?}")))
-    }
-
-    pub fn into_call_argument(self) -> CallArgument {
-        let argument = match self {
-            SpecialValue::Remote(remote) => {
-                CallArgument::builder()
-                    .object_id(remote.id)
-                    .build()
-            }
-            SpecialValue::BigInt(big_int) => {
-                let mut value = big_int.0;
-                value.push('n');
-                CallArgument::builder()
-                    .unserializable_value(value)
-                    .build()
-            }
-            SpecialValue::Undefined(_) => CallArgument::default(),
-        };
-        argument
-    }
-
-    pub fn from_json(json: &JsonObject) -> Option<Self> {
-        if let Ok(remote) = JsRemoteVal::deserialize(json) {
-            return Some(SpecialValue::Remote(remote));
-        }
-        if let Ok(big_int) = JsBigInt::deserialize(json) {
-            return Some(SpecialValue::BigInt(big_int));
-        }
-        if let Ok(undefined) = JsUndefined::deserialize(json) {
-            return Some(SpecialValue::Undefined(undefined));
-        }
-        None
-    }
-
-    pub fn into_json(&self) -> Result<JsonValue, serde_json::Error> {
-        let serializer = serde_json::value::Serializer;
-        let value = match self {
-            SpecialValue::Remote(data) => data.serialize(serializer)?,
-            SpecialValue::BigInt(big_int) => big_int.serialize(serializer)?,
-            SpecialValue::Undefined(undefined) => undefined.serialize(serializer)?,
-        };
-        Ok(value)
-    }
-
-    pub fn remote_object_id(&self) -> Option<RemoteObjectId> {
-        match self {
-            SpecialValue::Remote(remote) => Some(remote.id.clone()),
-            _ => None,
-        }
-    }
-}
-
-impl From<JsRemoteVal> for SpecialValue {
-    fn from(data: JsRemoteVal) -> Self {
-        SpecialValue::Remote(data)
-    }
-}
-
-impl From<JsRemoteObject> for SpecialValue {
-    fn from(remote_object: JsRemoteObject) -> Self {
-        let data = remote_object.val();
-        SpecialValue::Remote(data.clone())
-    }
-}
-
-impl From<JsBigInt> for SpecialValue {
-    fn from(big_int: JsBigInt) -> Self {
-        SpecialValue::BigInt(big_int)
-    }
-}
-
-//impl From<JsExpr> for SpecialValue {
-//    fn from(expr: JsExpr) -> Self {
-//        SpecialValue::Expr(expr)
-//    }
-//}
-
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct JsRemoteVal {
@@ -114,6 +14,10 @@ pub(crate) struct JsRemoteVal {
 }
 
 impl JsRemoteVal {
+    pub(crate) fn id(&self) -> &RemoteObjectId {
+        &self.id
+    }
+
     pub(crate) async fn from_remote_object(page: &Arc<PageInner>, remote_object: RemoteObject) -> Result<Self> {
         let Some(object_id) = remote_object.object_id else {
             return Err(CdpError::UnexpectedValue(format!("Remote object has no object id: {remote_object:?}")));
@@ -166,7 +70,7 @@ impl JsRemoteVal {
                             }
                         }
                     }
-                    None => JsObjectSubtype::None,
+                    None => JsObjectSubtype::Other,
                 };
                 JsRemoteObjectType::Object(subtype)
             }
@@ -186,6 +90,11 @@ impl JsRemoteVal {
             class: remote_object.class_name.unwrap_or_default(),
         };
         Ok(this)
+    }
+    pub(crate) fn into_call_argument(self) -> CallArgument {
+        CallArgument::builder()
+            .object_id(self.id)
+            .build()
     }
 }
 

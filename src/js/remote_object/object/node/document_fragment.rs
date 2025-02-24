@@ -41,7 +41,7 @@ js_remote_object!(
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend
             prepend<I, T>(...nodes: I) -> ()
@@ -54,13 +54,13 @@ js_remote_object!(
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelector
-            querySelector(selectors: impl IntoJs<str>) -> Option<JsElement>;
+            querySelector(selectors: impl IntoJs<String>) -> Option<JsElement>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelectorAll
-            querySelectorAll(selectors: impl IntoJs<str>) -> Vec<JsElement> {
+            querySelectorAll(selectors: impl IntoJs<String>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
@@ -76,13 +76,13 @@ js_remote_object!(
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/getElementById
-            getElementById(id: impl IntoJs<str>) -> Option<JsElement>;
+            getElementById(id: impl IntoJs<String>) -> Option<JsElement>;
 
             /// Extension
-            queryXpath(xpath: impl IntoJs<str>) -> Option<JsNode> {
+            queryXpath(xpath: impl IntoJs<String>) -> Option<JsNode> {
                 let document = this.ownerDocument;
                 let result = document.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 for (let i = 0; i < result.snapshotLength; i++) {
@@ -95,7 +95,7 @@ js_remote_object!(
             }
 
             /// Extension
-            queryXpathAll(xpath: impl IntoJs<str>) -> Vec<JsNode> {
+            queryXpathAll(xpath: impl IntoJs<String>) -> Vec<JsNode> {
                 let document = this.ownerDocument;
                 let result = document.evaluate(xpath, this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 let nodes = [];

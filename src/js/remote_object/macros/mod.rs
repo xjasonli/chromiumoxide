@@ -59,12 +59,12 @@ macro_rules! js_remote_object {
             pub struct [< Js $t >]([< Js $parent >]);
 
             impl [< Js $t >] {
-                pub fn is_instance_of<T: DerivedJs<[< Js $t >]>>(&self) -> bool {
-                    T::is_instance(self)
+                pub fn instance_of<T: JsDerived<[< Js $t >]>>(&self) -> bool {
+                    T::is_class_instance(self)
                 }
 
-                pub fn downcast<T: DerivedJs<[< Js $t >]>>(&self) -> Option<T::FromJs> {
-                    T::downcast_from(self.clone())
+                pub fn downcast<T: JsDerived<[< Js $t >]>>(&self) -> Option<T::FromJs> {
+                    T::downcast_from(Clone::clone(self))
                 }
             }
 
@@ -76,27 +76,19 @@ macro_rules! js_remote_object {
                 }
             }
 
-            // implement AsJs<Self> for Self
-            impl private::Sealed for [< Js $t >] {}
-            impl IntoJs<[< Js $t >]> for [< Js $t >] {
-                type FromJs = Self;
-            }
-            impl AsJs<[< Js $t >]> for [< Js $t >] {
-                fn as_js(&self) -> &[< Js $t >] {
-                    self
-                }
-            }
+            // implement IntoJs<Self> for Self
+            impl_into_js!([< Js $t >]);
+            //impl IntoJs<[< Js $t >]> for [< Js $t >] {
+            //    type FromJs = Self;
+            //}
 
-            // implement AsJs<Parent> for Self
-            impl IntoJs<[< Js $parent >]> for [< Js $t >] {
-                type FromJs = Self;
+            // implement IntoJs<Parent> for Self
+            impl_into_js!{
+                IntoJs<[< Js $parent >]> for [< Js $t >] => [< Js $t >]
             }
-
-            impl AsJs<[< Js $parent >]> for [< Js $t >] {
-                fn as_js(&self) -> &[< Js $parent >] {
-                    &self.0
-                }
-            }
+            //impl IntoJs<[< Js $parent >]> for [< Js $t >] {
+            //    type FromJs = Self;
+            //}
 
             // implement From<Self> for Parent
             impl From<[< Js $t >]> for [< Js $parent >] {
@@ -114,9 +106,10 @@ macro_rules! js_remote_object {
                 }
             }
 
-            // implement DerivedJs<Parent> for Self
-            impl DerivedJs<[< Js $parent >]> for [< Js $t >] {
-                fn is_instance(value: &[< Js $parent >]) -> bool {
+            // implement JsDerived<Parent> for Self
+            impl private::Sealed for [< Js $t >] {}
+            impl JsDerived<[< Js $parent >]> for [< Js $t >] {
+                fn is_class_instance(value: &[< Js $parent >]) -> bool {
                     $(
                         if !helper::TypePattern::matches($type, value.remote_object_type().name()) {
                             return false;
@@ -155,22 +148,20 @@ macro_rules! js_remote_object {
                     true
                 }
 
-                fn downcast_from_unchecked(value: [< Js $parent >]) -> Self::FromJs {
+                fn downcast_unchecked_from(value: [< Js $parent >]) -> Self::FromJs {
                     Self(value)
                 }
             }
 
             $($(
-                // implement AsJs<Ancestor> for Self
-                impl IntoJs<[< Js $ancestor >]> for [< Js $t >] {
-                    type FromJs = Self;
+                // implement IntoJs<Ancestor> for Self
+                impl_into_js!{
+                    IntoJs<[< Js $ancestor >]> for [< Js $t >] => [< Js $t >]
                 }
-                impl AsJs<[< Js $ancestor >]> for [< Js $t >] {
-                    fn as_js(&self) -> &[< Js $ancestor >] {
-                        &self.0
-                    }
-                }
-                
+                //impl IntoJs<[< Js $ancestor >]> for [< Js $t >] {
+                //    type FromJs = Self;
+                //}
+
                 // implement From<Self> for Ancestor
                 impl From<[< Js $t >]> for [< Js $ancestor >] {
                     fn from(value: [< Js $t >]) -> Self {
@@ -187,17 +178,47 @@ macro_rules! js_remote_object {
                     }
                 }
 
-                // implement DerivedJs<Ancestor> for Self
-                impl DerivedJs<[< Js $ancestor >]> for [< Js $t >] {
-                    fn is_instance(value: &[< Js $ancestor >]) -> bool {
-                        [< Js $parent >]::is_instance(value)
+                // implement JsDerived<Ancestor> for Self
+                impl JsDerived<[< Js $ancestor >]> for [< Js $t >] {
+                    fn is_class_instance(value: &[< Js $ancestor >]) -> bool {
+                        if !<[< Js $parent >] as JsDerived::<[< Js $ancestor >]>>::is_class_instance(value) {
+                            return false;
+                        }
+                        <[< Js $t >] as JsDerived::<[< Js $parent >]>>::is_class_instance(
+                            &<[< Js $parent >] as JsDerived::<[< Js $ancestor >]>>::downcast_unchecked_from(
+                                Clone::clone(value)
+                            )
+                        )
                     }
 
-                    fn downcast_from_unchecked(value: [< Js $ancestor >]) -> Self::FromJs {
-                        Self([< Js $parent >]::downcast_from_unchecked(value))
+                    fn downcast_unchecked_from(value: [< Js $ancestor >]) -> Self::FromJs {
+                        Self(
+                            <[< Js $parent >] as JsDerived::<[< Js $ancestor >]>>::downcast_unchecked_from(value)
+                        )
                     }
                 }
             )+)?
+
+            // implement From<Self> for ExecutionContextId
+            impl From<[< Js $t >]> for ExecutionContextId {
+                fn from(value: [< Js $t >]) -> Self {
+                    value.execution_context_id()
+                }
+            }
+
+            // implement From<&Self> for ExecutionContextId
+            impl From<&[< Js $t >]> for ExecutionContextId {
+                fn from(value: &[< Js $t >]) -> Self {
+                    value.execution_context_id()
+                }
+            }
+
+            // implement From<&mut Self> for ExecutionContextId
+            impl From<&mut [< Js $t >]> for ExecutionContextId {
+                fn from(value: &mut [< Js $t >]) -> Self {
+                    value.execution_context_id()
+                }
+            }
 
             // implement Serialize and Deserialize for Self
             impl serde::Serialize for [< Js $t >] {
@@ -397,7 +418,7 @@ macro_rules! js_remote_object_properties {
     ) => {
         $(#[doc = $doc])*
         pub async fn $rename(&self) -> Result<$ty> {
-            self.get_property(stringify!($name)).await
+            (self as &JsRemoteObject).get_property(stringify!($name)).await
         }
     };
     (@getter
@@ -423,7 +444,7 @@ macro_rules! js_remote_object_properties {
         paste::paste! {
             $(#[doc = $doc])*
             pub async fn [< set_ $rename >](&self, value: $ty) -> Result<()> {
-                self.set_property(stringify!($name), value).await
+                (self as &JsRemoteObject).set_property(stringify!($name), value).await
             }
         }
     };

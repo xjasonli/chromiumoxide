@@ -238,16 +238,17 @@ impl JsNode {
     }
 }
 
+/// Represents the position of a node in the document relative to another node.
+/// 
+/// This is a bitflag enum that corresponds to the values returned by
+/// [`Node.compareDocumentPosition()`](https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition).
+/// Multiple flags can be combined to describe complex relationships between nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct JsDocumentPosition(u32);
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(serde::Serialize, serde::Deserialize)]
-    #[serde(transparent)]
-    /// Represents the position of a node in the document relative to another node.
-    /// 
-    /// This is a bitflag enum that corresponds to the values returned by
-    /// [`Node.compareDocumentPosition()`](https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition).
-    /// Multiple flags can be combined to describe complex relationships between nodes.
-    pub struct JsDocumentPosition: u32 {
+    impl JsDocumentPosition: u32 {
         /// The two nodes are not in the same document
         const DISCONNECTED = 1;
         /// The second node precedes the reference node in the document
@@ -260,18 +261,6 @@ bitflags::bitflags! {
         const CONTAINED_BY = 16;
         /// The result depends on browser-specific implementation
         const IMPLEMENTATION_SPECIFIC = 32;
-    }
-}
-
-impl schemars::JsonSchema for JsDocumentPosition {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "JsDocumentPosition".into()
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        concat!(module_path!(), "::JsDocumentPosition").into()
-    }
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        generator.subschema_for::<u32>()
     }
 }
 

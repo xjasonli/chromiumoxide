@@ -1,6 +1,10 @@
 use serde::de::Error;
 use super::JsRemoteObjectCtx;
 
+std::thread_local!{
+    static CTX: std::cell::RefCell<Option<JsRemoteObjectCtx>> = std::cell::RefCell::new(None);
+}
+
 pub(crate) struct JsDeserializeSeed<T> {
     inner: T,
     ctx: JsRemoteObjectCtx,
@@ -11,6 +15,45 @@ impl<T> JsDeserializeSeed<T> {
         Self { inner, ctx }
     }
 }
+
+impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for JsDeserializeSeed<T> {
+    type Value = T::Value;
+
+    fn deserialize<D: serde::de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        struct Guard(std::marker::PhantomData<()>);
+        impl Guard {
+            pub fn new(ctx: JsRemoteObjectCtx) -> Self {
+                CTX.set(Some(ctx));
+                Self(std::marker::PhantomData)
+            }
+        }
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                CTX.set(None);
+            }
+        }
+
+        let _guard = Guard::new(self.ctx.clone());
+        self.inner.deserialize(deserializer)
+    }
+}
+
+pub(crate) fn get_ctx<'de, D: serde::de::Deserializer<'de>>(
+    _deserializer: &D,
+) -> Option<JsRemoteObjectCtx> {
+    CTX.with_borrow(|ctx| ctx.clone())
+}
+
+pub(crate) fn try_get_ctx<'de, D: serde::de::Deserializer<'de>>(
+    _deserializer: &D,
+) -> Result<JsRemoteObjectCtx, D::Error> {
+    get_ctx(_deserializer)
+        .ok_or_else(|| D::Error::custom(
+            "Deserializer is not a `JsDeserializer`"
+        ))
+}
+
+/*
 
 impl<'de, T: serde::de::DeserializeSeed<'de>> serde::de::DeserializeSeed<'de> for JsDeserializeSeed<T> {
     type Value = T::Value;
@@ -299,3 +342,4 @@ impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for JsVisitor<V> {
         }
     );
 }
+ */

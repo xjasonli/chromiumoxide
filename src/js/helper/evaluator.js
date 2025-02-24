@@ -1,5 +1,9 @@
  (...$chromiumoxideEvaluatorArguments$) => {
     ((v) => {
+        const JS_REMOTE_KEY = '$chromiumoxide::js::remote';
+        const JS_BIGINT_KEY = '$chromiumoxide::js::bigint';
+        const JS_UNDEFINED_KEY = '$chromiumoxide::js::undefined';
+
         // cross-realm compatible way to check if `value` is an array
         const isArray = (value) => {
             return typeof value === 'object' && value !== null &&
@@ -16,18 +20,21 @@
         }
 
         const mergeSpecials = (() => {
-            function mergeSpecials(descriptor, specials, exprValues) {
+            function mergeSpecials(descriptor, objects, exprValues) {
                 let { value, paths } = descriptor;
+
+                value = convertInlineSpecials(value);
+
                 for (let i = 0; i < paths.length; i++) {
-                    value = mergeSpecial(
+                    value = mergeSpecialByPath(
                         value,
                         paths[i],
-                        specials[i],
+                        objects[i],
                     );
                 }
 
                 for (let i = 0; i < exprValues.length; i++) {
-                    value = mergeSpecial(
+                    value = mergeSpecialByPath(
                         value,
                         exprValues[i].path,
                         exprValues[i].value
@@ -36,19 +43,52 @@
                 return value;
             };
 
-            function mergeSpecial(value, path, special) {
+            function convertInlineSpecials(value) {
+                if (typeof value !== 'object' || value === null) {
+                    return value;
+                }
+
+                if (Array.isArray(value)) {
+                    return value.map(convertInlineSpecials);
+                }
+                
+                if (value.hasOwnProperty(JS_BIGINT_KEY)) {
+                    const bigint = BigInt(value[JS_BIGINT_KEY]);
+                    return bigint;
+                }
+
+                if (value.hasOwnProperty(JS_UNDEFINED_KEY)) {
+                    return undefined;
+                }
+
+                if (value.hasOwnProperty(JS_REMOTE_KEY)) {
+                    throw new Error('encountered remote object key in argument value', { cause: value });
+                }
+
+                return Object.fromEntries(
+                    Object.entries(value).map(([key, val]) => [key, convertInlineSpecials(val)])
+                );
+            }
+
+            function mergeSpecialByPath(targetValue, path, value) {
                 if (path.length === 0) {
-                    return special;
+                    return value;
                 }
 
                 const segment = path[0];
-                if (typeof segment === 'string' && !isObject(value)) {
-                    value = {};
-                } else if (typeof segment === 'number' && !isArray(value)) {
-                    value = [];
+                // ensures targetValue is an object or an array
+                if (typeof segment === 'number') {
+                    if (!Array.isArray(targetValue)) {
+                        targetValue = [];
+                    }
+                } else if (typeof segment === 'string') {
+                    if (typeof targetValue !== 'object' || targetValue === null) {
+                        targetValue = {};
+                    }
                 }
-                value[segment] = mergeSpecial(value[segment], path.slice(1), special);
-                return value;
+
+                targetValue[segment] = mergeSpecialByPath(targetValue[segment], path.slice(1), value);
+                return targetValue;
             };
 
             return mergeSpecials;
@@ -95,7 +135,7 @@
                 }
                 let type = typeof value;
                 if (type === 'object') {
-                    if (Array.isArray(value)) {
+                    if (isArray(value)) {
                         return 'array';
                     } else {
                         return 'object';
@@ -582,18 +622,15 @@
                         { cause: { value } }
                     );
                 }
-
                 let paths = [];
-                let specials = [];
+                let values = [];
 
                 if (result.specials.length !== 0) {
-                    result.specials = sortAndUniqueSpecials(result.specials);
+                    const specials = sortAndUniqueSpecials(result.specials);
 
-                    paths = result.specials.map(s => s.path);
-                    specials = result.specials.map(s => s.value);
-
-                    // replace the container of the special value with a new container
-                    // for replacing the special value with `{}`
+                    // prepare the container of the special value, which replaces:
+                    // - `object` container with `{}`
+                    // - `array` container with `[]`
                     const cloneValue = (value) => {
                         if (typeof value === 'object' && value !== null) {
                             if (isArray(value)) {
@@ -605,14 +642,32 @@
                         throw new Error('encountered non-object container type for special value', { cause: value });
                     };
 
-                    const replaceSpecialValues = (inputValue) => {
-                        const replacedPaths = new Set();
-                        if (paths[0].length === 0) {
-                            // the root value is a special value
+                    function convertSpecialValue(path, special) {
+                        if (typeof special === 'bigint') {
+                            return {
+                                [JS_BIGINT_KEY]: special.toString()
+                            };
+                        } else if (special === undefined) {
+                            return {
+                                [JS_UNDEFINED_KEY]: true
+                            };
+                        } else {
+                            paths.push(path);
+                            values.push(special);
                             return {};
                         }
+                    }
+
+                    function replaceSpecialValues(inputValue) {
+                        const replacedPaths = new Set();
+                        if (specials[0].path.length === 0) {
+                            // the root value is a special value
+                            return convertSpecialValue(specials[0].path, specials[0].value);
+                        }
+
                         const replacedValue = cloneValue(inputValue);
-                        const replaceByPath = (path) => {
+
+                        function replaceByPath(path, special) {
                             let prefixPath = [];
                             let parentValue = replacedValue;
                             for (let i = 0; i < path.length - 1; i++) {
@@ -626,10 +681,11 @@
                                 parentValue = parentValue[pathSegment];
                             }
                             let lastPathSegment = path[path.length - 1];
-                            parentValue[lastPathSegment] = {};
+                            parentValue[lastPathSegment] = convertSpecialValue(path, special);
                         }
-                        for (let i = 0; i < paths.length; i++) {
-                            replaceByPath(paths[i]);
+
+                        for (let i = 0; i < specials.length; i++) {
+                            replaceByPath(specials[i].path, specials[i].value);
                         }
                         return replacedValue;
                     };
@@ -639,7 +695,7 @@
 
                 return {
                     descriptor: { value, paths },
-                    specials,
+                    values,
                 };
             });
         })();
@@ -666,13 +722,13 @@
     $chromiumoxideEvaluatorArguments$ = ((v) => ({
         config: v.shift(),
         thisDescriptor: v[0],
-        thisSpecials: (() => {
+        thisObjects: (() => {
             let descriptor = v.shift();
             let count = descriptor.paths
             return v.splice(0, descriptor.paths.length);
         })(),
         argsDescriptor: v[0],
-        argsSpecials: (() => {
+        argsObjects: (() => {
             let descriptor = v.shift();
             if (descriptor) {
                 return v.splice(0, descriptor.paths.length);
@@ -690,7 +746,7 @@
 
     $chromiumoxideEvaluatorArguments$.this = $chromiumoxideEvaluatorArguments$.mergeSpecials(
         $chromiumoxideEvaluatorArguments$.thisDescriptor,
-        $chromiumoxideEvaluatorArguments$.thisSpecials,
+        $chromiumoxideEvaluatorArguments$.thisObjects,
         $chromiumoxideEvaluatorArguments$.thisExprValues
     );
 
@@ -706,7 +762,7 @@
         $chromiumoxideEvaluatorArguments$.func = $chromiumoxideEvaluatorArguments$.exprValue;
         $chromiumoxideEvaluatorArguments$.args = $chromiumoxideEvaluatorArguments$.mergeSpecials(
             $chromiumoxideEvaluatorArguments$.argsDescriptor,
-            $chromiumoxideEvaluatorArguments$.argsSpecials,
+            $chromiumoxideEvaluatorArguments$.argsObjects,
             $chromiumoxideEvaluatorArguments$.argsExprValues
         );
     } else {

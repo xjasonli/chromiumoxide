@@ -15,28 +15,28 @@ js_remote_object!(
             item(index: usize) -> Option<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/contains
-            contains(token: impl IntoJs<str>) -> bool;
+            contains(token: impl IntoJs<String>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/add
             add<'a, I, T>(...tokens: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/remove
             remove<'a, I, T>(...tokens: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/replace
-            replace(old_token: impl IntoJs<str>, new_token: impl IntoJs<str>) -> bool;
+            replace(old_token: impl IntoJs<String>, new_token: impl IntoJs<String>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/supports
-            supports(token: impl IntoJs<str>) -> bool;
+            supports(token: impl IntoJs<String>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/toggle
-            toggle(token: impl IntoJs<str>, force?: bool) -> bool;
+            toggle(token: impl IntoJs<String>, force?: bool) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/entries
             entries() -> JsIterator;

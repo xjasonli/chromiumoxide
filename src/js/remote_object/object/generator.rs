@@ -9,7 +9,7 @@ js_remote_object!(
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Generator/next
             #[rename = +withValue]
-            next<T: FromJs, A: IntoJs>(value: A) -> JsIteratorResult<T>;
+            next<T: FromJsAny, A: IntoJsAny>(value: A) -> JsIteratorResult<T>;
         }
     }
 );

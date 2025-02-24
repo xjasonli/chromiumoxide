@@ -45,10 +45,10 @@ js_remote_object!(
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/appendData
-            appendData(data: impl IntoJs<str>) -> ();
+            appendData(data: impl IntoJs<String>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/before
             before<I, T>(...nodes: I) -> ()
@@ -61,19 +61,19 @@ js_remote_object!(
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/deleteData
             deleteData(offset: usize, count: usize) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/insertData
-            insertData(offset: usize, data: impl IntoJs<str>) -> ();
+            insertData(offset: usize, data: impl IntoJs<String>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/remove
             remove() -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceData
-            replaceData(offset: usize, count: usize, data: impl IntoJs<str>) -> ();
+            replaceData(offset: usize, count: usize, data: impl IntoJs<String>) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceWith
             replaceWith<I, T>(...nodes: I) -> ()
@@ -86,7 +86,7 @@ js_remote_object!(
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
-                T: IntoJs<str>;
+                T: IntoJs<String>;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/substringData
             substringData(offset: usize, count: usize) -> String;

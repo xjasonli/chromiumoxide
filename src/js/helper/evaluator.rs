@@ -16,10 +16,10 @@ pub(crate) struct Evaluator<'a> {
 impl<'a> Evaluator<'a> {
     pub fn new_object(
         page: Arc<PageInner>,
-        object: impl AsJs<JsRemoteObject>,
+        object: impl Into<JsRemoteObject>,
         options: EvalOptions,
     ) -> Self {
-        let target = EvalTarget::new_with_object(object);
+        let target = EvalTarget::new_with_object(object.into());
         Self { page, target, options }
     }
 
@@ -27,17 +27,16 @@ impl<'a> Evaluator<'a> {
         page: Arc<PageInner>,
         expr: impl Into<JsExpr<'a>>,
         execution_context_id: Option<ExecutionContextId>,
-        execution_context_object: Option<BoxedIntoJs<'a>>,
-        this: Option<BoxedIntoJs<'a>>,
+        this: Option<DynIntoJsAny<'a>>,
         options: EvalOptions,
     ) -> Self {
-        let target = EvalTarget::new(expr.into(), execution_context_id, execution_context_object, this);
+        let target = EvalTarget::new(expr.into(), execution_context_id, this);
         Self { page, target, options }
     }
 
     pub async fn eval<T>(self) -> Result<T>
     where
-        T: FromJs,
+        T: FromJsAny,
     {
         let schema = {
             let mut settings = schemars::generate::SchemaSettings::default();
@@ -75,33 +74,27 @@ pub(crate) struct EvalTarget<'a> {
     // the execution context for the expression
     pub(crate) execution_context_id: Option<ExecutionContextId>,
 
-    // the execution context (identified by a remote object) for the expression
-    pub(crate) execution_context_object: Option<BoxedIntoJs<'a>>,
-
     // the this value for the expression
-    pub(crate) this: Option<BoxedIntoJs<'a>>,
+    pub(crate) this: Option<DynIntoJsAny<'a>>,
 }
 
 impl<'a> EvalTarget<'a> {
     pub fn new_with_object(
-        object: impl AsJs<JsRemoteObject>,
+        object: JsRemoteObject,
     ) -> Self {
-        let object = object.as_js().clone();
         Self {
             expr: "this".into(),
             execution_context_id: Some(object.execution_context_id()),
-            execution_context_object: None,
-            this: Some(Box::new(object)),
+            this: Some(Arc::new(object)),
         }
     }
 
     pub fn new(
         expr: JsExpr<'a>,
         execution_context_id: Option<ExecutionContextId>,
-        execution_context_object: Option<BoxedIntoJs<'a>>,
-        this: Option<BoxedIntoJs<'a>>,
+        this: Option<DynIntoJsAny<'a>>,
     ) -> Self {
-        Self { expr, execution_context_id, execution_context_object, this }
+        Self { expr, execution_context_id, this }
     }
 
     pub(crate) async fn into_params(
@@ -112,7 +105,6 @@ impl<'a> EvalTarget<'a> {
         mode: ReturnMode,
         options: EvalOptions
     ) -> Result<(CallFunctionOnParams, ExecutionContextId)> {
-        let mut objects = vec![];
         let mut call_arguments = vec![];
 
         call_arguments.push(CallArgument::builder()
@@ -124,27 +116,14 @@ impl<'a> EvalTarget<'a> {
             .build()
         );
 
-        // extracts the execution context id from the execution context object
-        if let Some(execution_context_object) = self.execution_context_object {
-            let object = Argument::new(execution_context_object)?;
-            if let Some(execution_context_id) = object.execution_context_id {
-                self.execution_context_id.get_or_insert(execution_context_id);
-            } else {
-                // Should we return an error here?
-            }
-        }
-
         let this_exprs = {
             let this = Argument::new(self.this)?;
             call_arguments.push(CallArgument::builder()
                 .value(serde_json::to_value(this.descriptor)?)
                 .build()
             );
-            this.specials.into_iter().for_each(|special| {
-                if let Some(id) = special.remote_object_id() {
-                    objects.push(id);
-                }
-                call_arguments.push(special.into_call_argument());
+            this.values.into_iter().for_each(|value| {
+                call_arguments.push(value.into_call_argument());
             });
             if let Some(execution_context_id) = this.execution_context_id {
                 self.execution_context_id.get_or_insert(execution_context_id);
@@ -159,11 +138,8 @@ impl<'a> EvalTarget<'a> {
                     .value(serde_json::to_value(args.descriptor)?)
                     .build()
                 );
-                args.specials.into_iter().for_each(|special| {
-                    if let Some(id) = special.remote_object_id() {
-                        objects.push(id);
-                    }
-                    call_arguments.push(special.into_call_argument());
+                args.values.into_iter().for_each(|value| {
+                    call_arguments.push(value.into_call_argument());
                 });
                 if let Some(execution_context_id) = args.execution_context_id {
                     self.execution_context_id.get_or_insert(execution_context_id);
@@ -174,11 +150,13 @@ impl<'a> EvalTarget<'a> {
             }
         };
 
-        let execution_context_id = if let Some(execution_context_id) = self.execution_context_id {
-            execution_context_id
-        } else {
-            page.execution_context().await?
-                .ok_or(CdpError::msg("No execution context found"))?
+        let execution_context_id = {
+            if let Some(execution_context_id) = self.execution_context_id {
+                execution_context_id
+            } else {
+                page.execution_context().await?
+                    .ok_or(CdpError::msg("No execution context found"))?
+            }
         };
 
         let function = generate_function(&this_exprs, self.expr.as_str(), &args_exprs);
@@ -238,13 +216,13 @@ fn generate_function(
 #[derive(Debug, Clone, Default)]
 pub struct Argument {
     pub descriptor: ValueDescriptor,
-    pub specials: Vec<SpecialValue>,
+    pub values: Vec<JsRemoteVal>,
     pub exprs: Vec<(JsonPointer, String)>,
     pub execution_context_id: Option<ExecutionContextId>,
 }
 
 impl Argument {
-    pub fn new<T: IntoJs>(value: T) -> Result<Self> {
+    pub fn new<T: IntoJsAny>(value: T) -> Result<Self> {
         let ctx = ser::JsSerializerCtx::default();
         let serializer = ser::JsJsonSerializer::new_json_serializer(ctx.clone());
         let mut exprs = vec![];
@@ -256,7 +234,7 @@ impl Argument {
         let execution_context_id = ctx.borrow()
             .first()
             .map(|object| object.execution_context_id());
-        Ok(Self { descriptor, specials, exprs, execution_context_id })
+        Ok(Self { descriptor, values: specials, exprs, execution_context_id })
     }
 }
 
@@ -388,7 +366,7 @@ async fn execute_complex(page: Arc<PageInner>, params: CallFunctionOnParams) -> 
     } else {
         let array_id = {
             let params = CallFunctionOnParams::builder()
-                .function_declaration("function() { return this.specials; }")
+                .function_declaration("function() { return this.values; }")
                 .object_id(result_id)
                 .return_by_value(false)
                 .build().unwrap();
@@ -397,7 +375,7 @@ async fn execute_complex(page: Arc<PageInner>, params: CallFunctionOnParams) -> 
                 return Err(CdpError::JavascriptException(Box::new(exception)));
             }
             let Some(array_id) = resp.result.object_id else {
-                return Err(CdpError::UnexpectedValue(format!("Invalid specials: {:#?}", resp.result)));
+                return Err(CdpError::UnexpectedValue(format!("Invalid values: {:#?}", resp.result)));
             };
             array_id
         };
@@ -432,8 +410,8 @@ async fn execute_complex(page: Arc<PageInner>, params: CallFunctionOnParams) -> 
             return Err(CdpError::UnexpectedValue(format!("Invalid descriptor paths length: {:#?}", descriptor)));
         }
 
-        let mut specials = Vec::new();
-        specials.reserve(length);
+        let mut values = Vec::new();
+        values.reserve(length);
         let mut items_guard = RemoteValuesGuard::new(page.clone());
 
         for idx in 0..length {
@@ -445,13 +423,11 @@ async fn execute_complex(page: Arc<PageInner>, params: CallFunctionOnParams) -> 
             let Some(remote_object) = property.value else {
                 return Err(CdpError::UnexpectedValue(format!("Invalid properties: {:#?}", properties)));
             };
-            let special = SpecialValue::from_remote_object(&page, remote_object).await?;
-            if let Some(id) = special.remote_object_id() {
-                items_guard.add(id.clone());
-            }
-            specials.push(special);
+            let value = JsRemoteVal::from_remote_object(&page, remote_object).await?;
+            items_guard.add(value.id().clone());
+            values.push(value);
         }
-        let value = descriptor.merge(specials)?;
+        let value = descriptor.merge(values)?;
         items_guard.clear();
         Ok(value)
     }

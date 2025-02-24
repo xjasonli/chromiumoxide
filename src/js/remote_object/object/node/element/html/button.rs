@@ -64,13 +64,15 @@ js_remote_object!(
             reportValidity() -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLButtonElement/setCustomValidity
-            setCustomValidity<T: IntoJs<str>>(message: T) -> ();
+            setCustomValidity<T: IntoJs<String>>(message: T) -> ();
         }
     }
 );
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct JsValidityState {
     /// https://developer.mozilla.org/en-US/docs/Web/API/ValidityState/badInput
     #[serde(rename = "badInput")]
