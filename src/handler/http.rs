@@ -2,7 +2,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::network::{InterceptionId, RequestI
 use chromiumoxide_cdp::cdp::browser_protocol::page::FrameId;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HttpRequest {
     request_id: RequestId,
     pub from_memory_cache: bool,

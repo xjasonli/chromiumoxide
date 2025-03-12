@@ -203,39 +203,6 @@ impl JsNode {
             _ => panic!("JsNode is not a node"),
         }
     }
-
-    /// Returns the box model of the node
-    pub async fn box_model(&self) -> Result<BoxModel> {
-        let model = self
-            .page()
-            .execute(
-                GetBoxModelParams::builder()
-                .backend_node_id(self.backend_node_id())
-                .build(),
-            )
-            .await?
-            .result
-            .model;
-        Ok(BoxModel {
-            content: ElementQuad::from_quad(&model.content),
-            padding: ElementQuad::from_quad(&model.padding),
-            border: ElementQuad::from_quad(&model.border),
-            margin: ElementQuad::from_quad(&model.margin),
-            width: model.width as u32,
-            height: model.height as u32,
-        })
-    }
-
-    /// Returns the bounding box of the node (relative to the main frame)
-    pub async fn bounding_box(&self) -> Result<BoundingBox> {
-        let model = self.box_model().await?;
-        let quad = model.border;
-        let x = quad.most_left();
-        let y = quad.most_top();
-        let width = quad.most_right() - x;
-        let height = quad.most_bottom() - y;
-        Ok(BoundingBox { x, y, width, height })
-    }
 }
 
 /// Represents the position of a node in the document relative to another node.

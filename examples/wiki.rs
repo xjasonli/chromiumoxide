@@ -1,12 +1,12 @@
 use futures::StreamExt;
 
-use chromiumoxide::browser::{Browser, BrowserConfig};
+use chromiumoxide::{browser::{Browser, BrowserConfig}, JsHtmlButtonElement, JsHtmlInputElement};
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let (browser, mut handler) = Browser::launch(BrowserConfig::builder().build()?).await?;
+    let (browser, mut handler, _process) = Browser::launch(BrowserConfig::builder().build()?).await?;
 
     let handle = async_std::task::spawn(async move {
         loop {
@@ -16,14 +16,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let page = browser.new_page("https://en.wikipedia.org").await?;
 
-    page.find_element("input#searchInput")
+    let input = page.query_selector("input#searchInput")
         .await?
-        .click()
+        .expect("No input found")
+        .downcast::<JsHtmlInputElement>()
+        .expect("Input is not an HTML input element")
+        ;
+    input.scroll_into_view_if_needed().await?;
+    input.click().await?;
+    input.set_value("Rust (programming language)".to_string()).await?;
+
+    let button = page.query_selector("#searchform > button")
         .await?
-        .type_str("Rust (programming language)")
-        .await?
-        .press_key("Enter")
-        .await?;
+        .unwrap()
+        .downcast::<JsHtmlButtonElement>()
+        .unwrap()
+        ;
+    button.click().await?;
 
     let _html = page.wait_for_navigation().await?.content().await?;
 

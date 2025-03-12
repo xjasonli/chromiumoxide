@@ -22,7 +22,7 @@ impl BrowserContext {
         self.id.as_ref()
     }
 
-    pub(crate) fn take(&mut self) -> Option<BrowserContextId> {
+    pub fn take(&mut self) -> Option<BrowserContextId> {
         self.id.take()
     }
 }

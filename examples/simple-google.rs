@@ -7,7 +7,7 @@ use tokio::task;
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-    let (browser, mut handler) = Browser::launch(
+    let (browser, mut handler, _process) = Browser::launch(
         BrowserConfigBuilder::default()
             .request_timeout(Duration::from_secs(5))
             .build()

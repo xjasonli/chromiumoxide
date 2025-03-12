@@ -12,7 +12,7 @@ use futures::StreamExt;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let (browser, mut handler) = chromiumoxide::Browser::connect(
+    let (browser, mut handler) = chromiumoxide::Browser::connect_with_config(
         "ws://127.0.0.1:9222/devtools/browser/191fdaef-494d-41b5-8b94-4abd04dff33c",
         HandlerConfig::default(),
     )

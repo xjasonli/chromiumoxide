@@ -8,7 +8,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::page::CaptureScreenshotFormat;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let (browser, mut handler) = Browser::launch(BrowserConfig::builder().build()?).await?;
+    let (browser, mut handler, _process) = Browser::launch(BrowserConfig::builder().build()?).await?;
 
     let handle = async_std::task::spawn(async move {
         loop {
@@ -30,10 +30,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     // get the top post and save a screenshot of it
-    page.find_element("table.itemlist tr")
+    let image = page.query_selector("table.itemlist tr")
         .await?
-        .save_screenshot(CaptureScreenshotFormat::Png, "top-post.png")
+        .expect("No top post found")
+        .screenshot(CaptureScreenshotFormat::Png)
         .await?;
+
+    std::fs::write("top-post.png", image)?;
 
     handle.await;
     Ok(())

@@ -1,11 +1,12 @@
 use super::*;
 use std::collections::HashMap;
-use crate::error::Result;
+use crate::{error::Result, layout::Point};
 
 pub mod html;
 pub mod svg;
 pub mod math_ml;
 
+use chromiumoxide_cdp::cdp::browser_protocol::page::CaptureScreenshotFormat;
 pub use html::*;
 pub use svg::*;
 pub use math_ml::*;
@@ -413,6 +414,138 @@ js_remote_object!(
     }
 );
 
+impl JsElement {
+    /// Returns the box model of the element
+    pub async fn box_model(&self) -> Result<BoxModel> {
+        let model = self
+            .page()
+            .execute(
+                GetBoxModelParams::builder()
+                .backend_node_id(self.backend_node_id())
+                .build(),
+            )
+            .await?
+            .result
+            .model;
+        Ok(BoxModel {
+            content: ElementQuad::from_quad(&model.content),
+            padding: ElementQuad::from_quad(&model.padding),
+            border: ElementQuad::from_quad(&model.border),
+            margin: ElementQuad::from_quad(&model.margin),
+            width: model.width as u32,
+            height: model.height as u32,
+        })
+    }
+
+    /// Returns the bounding box of the node (relative to the main frame)
+    pub async fn bounding_box(&self) -> Result<BoundingBox> {
+        let model = self.box_model().await?;
+        let quad = model.border;
+        let x = quad.most_left();
+        let y = quad.most_top();
+        let width = quad.most_right() - x;
+        let height = quad.most_bottom() - y;
+        Ok(BoundingBox { x, y, width, height })
+    }
+
+    /// Returns the content quads of the element
+    pub async fn content_quads(&self) -> Result<Vec<ElementQuad>> {
+        use chromiumoxide_cdp::cdp::browser_protocol::dom::GetContentQuadsParams;
+        let quads = self.page().execute(
+            GetContentQuadsParams::builder()
+            .backend_node_id(self.backend_node_id())
+            .build(),
+        )
+        .await?
+        .result
+        .quads;
+
+        Ok(
+            quads.iter()
+                .map(ElementQuad::from_quad)
+                .collect()
+        )
+    }
+
+    /// Returns the best `Point` of this element to execute a click on.
+    pub async fn clickable_point(&self) -> Result<Point> {
+        let quads = self.content_quads().await?;
+        quads.iter()
+            .filter(|q| q.quad_area() > 1.)
+            .map(|q| q.quad_center())
+            .next()
+            .ok_or_else(|| CdpError::msg("Node is either not visible or not an HTMLElement"))
+    }
+
+    /// Scrolls the element into view if needed
+    pub async fn scroll_into_view_if_needed(&self) -> Result<&Self> {
+        if !self.is_connected().await? {
+            return Err(CdpError::ScrollingFailed("Element is not connected".to_string()));
+        }
+
+        use chromiumoxide_cdp::cdp::browser_protocol::dom::ScrollIntoViewIfNeededParams;
+        let params = ScrollIntoViewIfNeededParams::builder()
+            .backend_node_id(self.backend_node_id())
+            .build();
+        if let Err(_) = self.page().execute(params).await {
+            let options = JsScrollIntoViewOptions {
+                block: Some("center".to_string()),
+                inline: Some("center".to_string()),
+                behavior: Some("instant".to_string()),
+            };
+            self.scroll_into_view_with_options(&options).await?;
+        }
+        Ok(self)
+    }
+
+    /// Scrolls the element into view and uses a mouse event to move the mouse
+    /// over the center of this element.
+    pub async fn mouse_hover(&self) -> Result<&Self> {
+        self.scroll_into_view_if_needed().await?;
+        self.page().move_mouse(self.clickable_point().await?).await?;
+        Ok(self)
+    }
+
+    /// Scrolls the element into view and uses a mouse event to click on the
+    /// center of this element.
+    pub async fn mouse_click(&self) -> Result<&Self> {
+        self.scroll_into_view_if_needed().await?;
+        self.page().click(self.clickable_point().await?).await?;
+        Ok(self)
+    }
+
+    /// Scrolls the element into and takes a screenshot of it
+    pub async fn screenshot(&self, format: CaptureScreenshotFormat) -> Result<Vec<u8>> {
+        let mut bounding_box = self.scroll_into_view_if_needed().await?
+            .bounding_box().await?;
+        let viewport = self.page()
+            .layout_metrics().await?
+            .css_layout_viewport;
+
+        bounding_box.x += viewport.page_x as f64;
+        bounding_box.y += viewport.page_y as f64;
+
+        use chromiumoxide_cdp::cdp::browser_protocol::page::Viewport;
+        let clip = Viewport {
+            x: viewport.page_x as f64 + bounding_box.x,
+            y: viewport.page_y as f64 + bounding_box.y,
+            width: bounding_box.width,
+            height: bounding_box.height,
+            scale: 1.,
+        };
+
+        use chromiumoxide_cdp::cdp::browser_protocol::page::CaptureScreenshotParams;
+        self.page()
+            .screenshot(
+                CaptureScreenshotParams::builder()
+                    .format(format)
+                    .clip(clip)
+                    .build(),
+            )
+            .await
+    }
+
+}
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API/Keyframe_Formats
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]

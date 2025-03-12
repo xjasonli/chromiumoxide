@@ -13,8 +13,7 @@ use chromiumoxide_cdp::cdp::browser_protocol::emulation::{
     SetDeviceMetricsOverrideParams,
 };
 use chromiumoxide_cdp::cdp::browser_protocol::input::{
-    DispatchMouseEventParams, DispatchMouseEventType,
-    MouseButton,
+    DispatchKeyEventParams, DispatchKeyEventType, DispatchMouseEventParams, DispatchMouseEventType, MouseButton
 };
 use chromiumoxide_cdp::cdp::browser_protocol::page::{
     FrameId, GetLayoutMetricsParams, GetLayoutMetricsReturns, Viewport,
@@ -36,7 +35,7 @@ use crate::js::{self, EvaluationResult};
 use crate::layout::Point;
 use crate::listeners::{EventListenerRequest, EventStream};
 use crate::page::ScreenshotParams;
-use crate::{utils, ArcHttpRequest};
+use crate::{keys, utils, ArcHttpRequest};
 
 #[derive(Debug)]
 pub struct PageHandle {
@@ -78,7 +77,7 @@ impl PageInner {
         execute(cmd, self.sender.clone(), Some(self.session_id.clone()))?.await
     }
 
-    pub(crate) async fn execute_no_wait<T: Command>(&self, cmd: T) -> Result<()> {
+    pub(crate) fn execute_no_wait<T: Command>(&self, cmd: T) -> Result<()> {
         execute(cmd, self.sender.clone(), Some(self.session_id.clone()))
             .map(|_fut| ())
     }
@@ -183,76 +182,54 @@ impl PageInner {
         Ok(self)
     }
 
-//    /// This simulates pressing keys on the page.
-//    ///
-//    /// # Note The `input` is treated as series of `KeyDefinition`s, where each
-//    /// char is inserted as a separate keystroke. So sending
-//    /// `page.type_str("Enter")` will be processed as a series of single
-//    /// keystrokes:  `["E", "n", "t", "e", "r"]`. To simulate pressing the
-//    /// actual Enter key instead use `page.press_key(
-//    /// keys::get_key_definition("Enter").unwrap())`.
-//    pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
-//        for c in input.as_ref().split("").filter(|s| !s.is_empty()) {
-//            self.press_key(c).await?;
-//        }
-//        Ok(self)
-//    }
-//
-//    /// Uses the `DispatchKeyEvent` mechanism to simulate pressing keyboard
-//    /// keys.
-//    pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
-//        let key = key.as_ref();
-//        let key_definition = keys::get_key_definition(key)
-//            .ok_or_else(|| CdpError::msg(format!("Key not found: {key}")))?;
-//        let mut cmd = DispatchKeyEventParams::builder();
-//
-//        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L114-L115
-//        // And https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L52
-//        let key_down_event_type = if let Some(txt) = key_definition.text {
-//            cmd = cmd.text(txt);
-//            DispatchKeyEventType::KeyDown
-//        } else if key_definition.key.len() == 1 {
-//            cmd = cmd.text(key_definition.key);
-//            DispatchKeyEventType::KeyDown
-//        } else {
-//            DispatchKeyEventType::RawKeyDown
-//        };
-//
-//        cmd = cmd
-//            .r#type(DispatchKeyEventType::KeyDown)
-//            .key(key_definition.key)
-//            .code(key_definition.code)
-//            .windows_virtual_key_code(key_definition.key_code)
-//            .native_virtual_key_code(key_definition.key_code);
-//
-//        self.execute(cmd.clone().r#type(key_down_event_type).build().unwrap())
-//            .await?;
-//        self.execute(cmd.r#type(DispatchKeyEventType::KeyUp).build().unwrap())
-//            .await?;
-//        Ok(self)
-//    }
-//
-//    /// Calls function with given declaration on the remote object with the
-//    /// matching id
-//    pub async fn call_js_fn(
-//        &self,
-//        function_declaration: impl Into<String>,
-//        await_promise: bool,
-//        remote_object_id: RemoteObjectId,
-//    ) -> Result<CallFunctionOnReturns> {
-//        let resp = self
-//            .execute(
-//                CallFunctionOnParams::builder()
-//                    .object_id(remote_object_id)
-//                    .function_declaration(function_declaration)
-//                    .generate_preview(true)
-//                    .await_promise(await_promise)
-//                    .build()
-//                    .unwrap(),
-//            )
-//            .await?;
-//        Ok(resp.result)
-//    }
+    /// This simulates pressing keys on the page.
+    ///
+    /// # Note The `input` is treated as series of `KeyDefinition`s, where each
+    /// char is inserted as a separate keystroke. So sending
+    /// `page.type_str("Enter")` will be processed as a series of single
+    /// keystrokes:  `["E", "n", "t", "e", "r"]`. To simulate pressing the
+    /// actual Enter key instead use `page.press_key(
+    /// keys::get_key_definition("Enter").unwrap())`.
+    pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
+        for c in input.as_ref().split("").filter(|s| !s.is_empty()) {
+            self.press_key(c).await?;
+        }
+        Ok(self)
+    }
+
+    /// Uses the `DispatchKeyEvent` mechanism to simulate pressing keyboard
+    /// keys.
+    pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
+        let key = key.as_ref();
+        let key_definition = keys::get_key_definition(key)
+            .ok_or_else(|| CdpError::msg(format!("Key not found: {key}")))?;
+        let mut cmd = DispatchKeyEventParams::builder();
+
+        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L114-L115
+        // And https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L52
+        let key_down_event_type = if let Some(txt) = key_definition.text {
+            cmd = cmd.text(txt);
+            DispatchKeyEventType::KeyDown
+        } else if key_definition.key.len() == 1 {
+            cmd = cmd.text(key_definition.key);
+            DispatchKeyEventType::KeyDown
+        } else {
+            DispatchKeyEventType::RawKeyDown
+        };
+
+        cmd = cmd
+            .r#type(DispatchKeyEventType::KeyDown)
+            .key(key_definition.key)
+            .code(key_definition.code)
+            .windows_virtual_key_code(key_definition.key_code)
+            .native_virtual_key_code(key_definition.key_code);
+
+        self.execute(cmd.clone().r#type(key_down_event_type).build().unwrap())
+            .await?;
+        self.execute(cmd.r#type(DispatchKeyEventType::KeyUp).build().unwrap())
+            .await?;
+        Ok(self)
+    }
 
     pub async fn evaluate_expression(
         &self,

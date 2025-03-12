@@ -548,6 +548,16 @@ impl Page {
         Ok(self)
     }
 
+    pub async fn press_key(&self, key: impl AsRef<str>) -> Result<&Self> {
+        self.inner.press_key(key).await?;
+        Ok(self)
+    }
+
+    pub async fn type_str(&self, input: impl AsRef<str>) -> Result<&Self> {
+        self.inner.type_str(input).await?;
+        Ok(self)
+    }
+
     /// Take a screenshot of the current page
     pub async fn screenshot(&self, params: impl Into<ScreenshotParams>) -> Result<Vec<u8>> {
         self.inner.screenshot(params).await
@@ -895,16 +905,11 @@ impl Page {
     }
 
     /// Returns the title of the document.
-    pub async fn get_title(&self) -> Result<Option<String>> {
-        let result = self.evaluate("document.title").await?;
-
-        let title: String = result.into_value()?;
-
-        if title.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(title))
-        }
+    pub async fn get_title(&self) -> Result<String> {
+        self.get_document().await?
+            .downcast::<js::JsHtmlDocument>()
+            .ok_or_else(|| CdpError::msg("Page is not an HTML document"))?
+            .title().await
     }
 
     /// Retrieve current values of run-time metrics.
@@ -943,6 +948,7 @@ impl Page {
     ///     # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.7.0", note = "Use `self.eval` instead")]
     pub async fn evaluate_expression(
         &self,
         evaluate: impl Into<EvaluateParams>,
@@ -1010,6 +1016,7 @@ impl Page {
     ///     # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.7.0", note = "Use `self.eval` or `self.invoke_function` instead")]
     pub async fn evaluate(&self, evaluate: impl Into<Evaluation>) -> Result<EvaluationResult> {
         match evaluate.into() {
             Evaluation::Expression(mut expr) => {
@@ -1023,17 +1030,17 @@ impl Page {
                         None
                     }
                 });
-                let res = self.evaluate_expression(expr).await?;
+                let res = self.inner.evaluate_expression(expr).await?;
 
                 if res.object().r#type == RemoteObjectType::Function {
                     // expression was actually a function
                     if let Some(fallback) = fallback {
-                        return self.evaluate_function(fallback).await;
+                        return self.inner.evaluate_function(fallback).await;
                     }
                 }
                 Ok(res)
             }
-            Evaluation::Function(fun) => Ok(self.evaluate_function(fun).await?),
+            Evaluation::Function(fun) => Ok(self.inner.evaluate_function(fun).await?),
         }
     }
 
@@ -1089,6 +1096,7 @@ impl Page {
     ///     # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.7.0", note = "Use `self.invoke_function` instead")]
     pub async fn evaluate_function(
         &self,
         evaluate: impl Into<CallFunctionOnParams>,
@@ -1169,7 +1177,7 @@ impl Page {
             .execution_context_for_world(None, DOMWorldKind::Secondary)
             .await?;
 
-        self.evaluate_function(call).await?;
+        self.inner.evaluate_function(call).await?;
         // relying that document.open() will reset frame lifecycle with "init"
         // lifecycle event. @see https://crrev.com/608658
         self.wait_for_navigation().await
@@ -1177,9 +1185,9 @@ impl Page {
 
     /// Returns the HTML content of the page
     pub async fn content(&self) -> Result<String> {
-        Ok(self
-            .evaluate(
-                "{
+        Ok(self.inner
+            .evaluate_function(
+                "function() {
           let retVal = '';
           if (document.doctype) {
             retVal = new XMLSerializer().serializeToString(document.doctype);
@@ -1198,9 +1206,9 @@ impl Page {
     #[cfg(feature = "bytes")]
     /// Returns the HTML content of the page
     pub async fn content_bytes(&self) -> Result<bytes::Bytes> {
-        Ok(self
-            .evaluate(
-                "{
+        Ok(self.inner
+            .evaluate_function(
+                "function() {
             let retVal = '';
             if (document.doctype) {
             retVal = new XMLSerializer().serializeToString(document.doctype);
