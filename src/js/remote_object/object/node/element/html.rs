@@ -8,10 +8,13 @@ pub mod input;
 pub mod image;
 pub mod iframe;
 pub mod label;
+pub mod option;
+pub mod select;
 pub mod table;
 pub mod table_cell;
 pub mod table_row;
 pub mod table_section;
+pub mod text_area;
 
 pub use anchor::*;
 pub use button::*;
@@ -21,10 +24,13 @@ pub use input::*;
 pub use image::*;
 pub use iframe::*;
 pub use label::*;
+pub use option::*;
+pub use select::*;
 pub use table::*;
 pub use table_cell::*;
 pub use table_row::*;
 pub use table_section::*;
+pub use text_area::*;
 
 js_remote_object!(
     /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
