@@ -161,17 +161,21 @@ js_remote_object!{
 
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
-            addEventListener<T>(name: impl IntoJs<String>, listener: T, options?: &JsAddEventListenerOptions) -> ()
-            where
-                T: IntoJs<JsFunction>;
+            addEventListener(
+                name: impl IntoJs<String>, 
+                listener: impl IntoJs<JsFunction>, 
+                options?: &JsAddEventListenerOptions
+            ) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener
-            removeEventListener<T>(name: impl IntoJs<String>, listener: T, options?: &JsRemoveEventListenerOptions) -> ()
-            where
-                T: IntoJs<JsFunction>;
+            removeEventListener(
+                name: impl IntoJs<String>, 
+                listener: impl IntoJs<JsFunction>, 
+                options?: &JsRemoveEventListenerOptions
+            ) -> ();
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
-            dispatchEvent(event: impl IntoJs<JsObject>) -> bool;
+            dispatchEvent(event: impl IntoJs<JsEvent>) -> bool;
         }
     }
 }
