@@ -132,8 +132,6 @@ impl NetworkManager {
     }
 
     pub fn on_fetch_request_paused(&mut self, event: &EventRequestPaused) {
-        println!("----------------------------------");
-        println!("on_fetch_request_paused: {:#?}", event);
         if !self.user_request_interception_enabled && self.protocol_request_interception_enabled {
             self.push_cdp_request(ContinueRequestParams::new(event.request_id.clone()))
         }
@@ -189,8 +187,6 @@ impl NetworkManager {
 
     /// Request interception doesn't happen for data URLs with Network Service.
     pub fn on_request_will_be_sent(&mut self, event: &EventRequestWillBeSent) {
-        println!("----------------------------------");
-        println!("on_request_will_be_sent: {:#?}", event);
         if self.protocol_request_interception_enabled && !event.request.url.starts_with("data:") {
             if let Some(interception_id) = self
                 .request_id_to_interception_id
@@ -214,8 +210,6 @@ impl NetworkManager {
     }
 
     pub fn on_response_received(&mut self, event: &EventResponseReceived) {
-        println!("----------------------------------");
-        println!("on_response_received: {:#?}", event);
         if let Some(mut request) = self.requests.remove(event.request_id.as_ref()) {
             request.set_response(event.response.clone());
             self.queued_events
@@ -224,8 +218,6 @@ impl NetworkManager {
     }
 
     pub fn on_network_loading_finished(&mut self, event: &EventLoadingFinished) {
-        println!("----------------------------------");
-        println!("on_network_loading_finished: {:#?}", event);
         if let Some(request) = self.requests.remove(event.request_id.as_ref()) {
             if let Some(interception_id) = request.interception_id.as_ref() {
                 self.attempted_authentications
@@ -237,8 +229,6 @@ impl NetworkManager {
     }
 
     pub fn on_network_loading_failed(&mut self, event: &EventLoadingFailed) {
-        println!("----------------------------------");
-        println!("on_network_loading_failed: {:#?}", event);
         if let Some(mut request) = self.requests.remove(event.request_id.as_ref()) {
             request.failure_text = Some(event.error_text.clone());
             if let Some(interception_id) = request.interception_id.as_ref() {
@@ -271,8 +261,6 @@ impl NetworkManager {
             redirect_chain,
         );
 
-        println!("----------------------------------");
-        println!("request: {:#?}", request);
         self.requests.insert(event.request_id.clone(), request);
         self.queued_events
             .push_back(NetworkEvent::Request(event.request_id.clone()));

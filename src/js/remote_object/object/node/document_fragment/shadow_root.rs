@@ -44,7 +44,11 @@ js_remote_object!(
             slotAssignment: String [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/ShadowRoot/styleSheets
-            styleSheets: JsObject [readonly];
+            styleSheets: Vec<JsCssStyleSheet> [readonly] {
+                get() {
+                    return Array.from(this.styleSheets)
+                }
+            }
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/ShadowRoot/getAnimations

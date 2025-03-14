@@ -238,7 +238,7 @@ bitflags::bitflags! {
 /// in the DOM tree.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, schemars::JsonSchema_repr)]
-#[repr(u8)]
+#[repr(u16)]
 pub enum JsNodeType {
     /// An Element node like <p> or <div>
     Element = 1,

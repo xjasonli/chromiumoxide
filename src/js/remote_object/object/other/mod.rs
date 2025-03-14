@@ -66,14 +66,26 @@ pub use trusted_type_policy_factory::*;
 pub mod image_bitmap;
 pub use image_bitmap::*;
 
+pub mod css_rule;
+pub use css_rule::*;
+
+pub mod css_rule_list;
+pub use css_rule_list::*;
+
 pub mod css_style_declaration;
 pub use css_style_declaration::*;
+
+pub mod css_style_sheet;
+pub use css_style_sheet::*;
 
 pub mod screen_details;
 pub use screen_details::*;
 
 pub mod selection;
 pub use selection::*;
+
+pub mod media_list;
+pub use media_list::*;
 
 pub mod media_query_list;
 pub use media_query_list::*;

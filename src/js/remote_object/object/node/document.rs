@@ -151,7 +151,11 @@ js_remote_object!(
             scrollingElement: Option<JsElement> [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/stylesheets
-            styleSheets: JsObject [readonly];
+            styleSheets: Vec<JsCssStyleSheet> [readonly] {
+                get() {
+                    return Array.from(this.styleSheets);
+                }
+            }
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Document/timeline
             timeline: JsObject [readonly];
@@ -446,7 +450,7 @@ pub struct JsRequestStorageAccessOptions {
 /// https://developer.mozilla.org/en-US/docs/Web/API/XPathResult#constants
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, schemars::JsonSchema_repr)]
-#[repr(u8)]
+#[repr(u16)]
 pub enum JsXpathResultType {
     /// A result set containing whatever type naturally results from evaluation
     /// of the expression. Note that if the result is a node-set then

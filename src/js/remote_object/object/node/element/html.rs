@@ -120,7 +120,7 @@ js_remote_object!(
             spellcheck: bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/style
-            style: JsObject;
+            style: JsCssStyleDeclaration;
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/tabIndex
             tabIndex: i32;
