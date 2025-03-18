@@ -151,11 +151,11 @@ impl<'a> FunctionInvoker<'a> {
         Ok(value)
     }
 
-    pub(crate) async fn invoke_with_schema(self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
+    pub(crate) async fn invoke_with_schema(&self, schema: Schema) -> Result<(JsonValue, ExecutionContextId)> {
         let (value, execution_context_id) = helper::evaluate(
             self.page.clone(),
-            self.target,
-            Some(self.params),
+            &self.target,
+            Some(&self.params),
             schema,
             self.options
         ).await?;

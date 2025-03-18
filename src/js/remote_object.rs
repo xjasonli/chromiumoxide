@@ -109,7 +109,7 @@ impl JsRemoteObject {
     /// # use chromiumoxide::js::JsElement;
     /// # fn example(obj: JsRemoteObject) {
     /// if obj.instance_of::<JsElement>() {
-    ///     // This object is an HTML element
+    ///     // This object is an element
     /// }
     /// # }
     /// ```
@@ -137,6 +137,20 @@ impl JsRemoteObject {
         T::downcast_from(self.clone())
     }
 
+    /// Attempts to downcast this object to a more specific type.
+    /// 
+    /// This method does not perform any type checks. It is the responsibility
+    /// of the caller to ensure that the object is of the correct type.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use chromiumoxide::js::JsRemoteObject;
+    /// # use chromiumoxide::js::JsElement;
+    /// # fn example(obj: JsRemoteObject) {
+    /// let element = obj.downcast_unchecked::<JsElement>();
+    /// // element.query_selector(".class")...
+    /// # }
+    /// ```
     pub fn downcast_unchecked<T: JsDerived<Self>>(&self) -> T::FromJs {
         T::downcast_unchecked_from(self.clone())
     }

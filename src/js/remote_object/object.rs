@@ -53,34 +53,66 @@ js_remote_object!(
 
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
-            objectAssign<I, T>(...sources: I) -> Self
+            object_assign<I, T>(...sources: I) -> Self
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJsAny {
                 return Object.assign(this, ...sources);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
-            objectCreate() -> Self {
-                return Object.create(this);
-            }
-
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
-            /// 
-            #[rename = + withProperties]
-            objectCreate<T: IntoJsAny>(properties: T) -> Self {
-                return Object.create(this, properties);
-            }
-
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperties
             /// 
-            objectDefineProperties<T: IntoJsAny>(properties: T) -> Self {
+            defineProperties<T: IntoJsAny>(properties: T) -> Self {
                 return Object.defineProperties(this, properties);
             }
 
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty
+            defineProperty<T: IntoJsAny>(key: String, descriptor: T) -> Self {
+                return Object.defineProperty(this, key, descriptor);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries
+            object_entries<T: FromJsAny>() -> Vec<(String, T)> {
+                return Object.entries(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyDescriptor
+            getOwnPropertyDescriptor<T: FromJsAny>(key: impl IntoJs<String>) -> Option<T> {
+                return Object.getOwnPropertyDescriptor(this, key);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames
+            getOwnPropertyNames() -> Vec<String> {
+                return Object.getOwnPropertyNames(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertySymbols
+            getOwnPropertySymbols() -> Vec<JsSymbol> {
+                return Object.getOwnPropertySymbols(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getPrototypeOf
+            getPrototypeOf() -> JsObject {
+                return Object.getPrototypeOf(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn
+            object_hasOwn(key: impl IntoJs<String>) -> bool {
+                return Object.hasOwn(this, key);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
+            object_keys() -> Vec<String> {
+                return Object.keys(this);
+            }
+
+            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/values
+            object_values<T: FromJsAny>() -> Vec<T> {
+                return Object.values(this);
+            }
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwnProperty
-            hasOwnProperty(key: String) -> bool;
+            hasOwnProperty(key: impl IntoJs<String>) -> bool;
 
             /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/isPrototypeOf
             isPrototypeOf(value: &JsObject) -> bool;

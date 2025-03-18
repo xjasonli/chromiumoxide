@@ -45,7 +45,7 @@ impl<'a> Evaluator<'a> {
         };
         let (value, execution_context_id) = evaluate(
             self.page.clone(),
-            self.target,
+            &self.target,
             None,
             schema,
             self.options
@@ -98,13 +98,14 @@ impl<'a> EvalTarget<'a> {
     }
 
     pub(crate) async fn into_params(
-        mut self,
+        &self,
         page: Arc<PageInner>,
-        invoke: Option<InvokeParams<'a>>,
+        invoke: Option<&InvokeParams<'a>>,
         schema: Schema,
         mode: ReturnMode,
         options: EvalOptions
     ) -> Result<(CallFunctionOnParams, ExecutionContextId)> {
+        let mut context_id = self.execution_context_id.clone();
         let mut call_arguments = vec![];
 
         call_arguments.push(CallArgument::builder()
@@ -117,7 +118,7 @@ impl<'a> EvalTarget<'a> {
         );
 
         let this_exprs = {
-            let this = Argument::new(self.this)?;
+            let this = Argument::new(&self.this)?;
             call_arguments.push(CallArgument::builder()
                 .value(serde_json::to_value(this.descriptor)?)
                 .build()
@@ -126,7 +127,7 @@ impl<'a> EvalTarget<'a> {
                 call_arguments.push(value.into_call_argument());
             });
             if let Some(execution_context_id) = this.execution_context_id {
-                self.execution_context_id.get_or_insert(execution_context_id);
+                context_id.get_or_insert(execution_context_id);
             }
             this.exprs
         };
@@ -142,7 +143,7 @@ impl<'a> EvalTarget<'a> {
                     call_arguments.push(value.into_call_argument());
                 });
                 if let Some(execution_context_id) = args.execution_context_id {
-                    self.execution_context_id.get_or_insert(execution_context_id);
+                    context_id.get_or_insert(execution_context_id);
                 }
                 args.exprs
             } else {
@@ -151,7 +152,7 @@ impl<'a> EvalTarget<'a> {
         };
 
         let execution_context_id = {
-            if let Some(execution_context_id) = self.execution_context_id {
+            if let Some(execution_context_id) = context_id {
                 execution_context_id
             } else {
                 page.execution_context().await?
@@ -298,8 +299,8 @@ struct EvaluateConfig {
 
 pub(crate) async fn evaluate<'a>(
     page: Arc<PageInner>,
-    target: EvalTarget<'a>,
-    invoke: Option<InvokeParams<'a>>,
+    target: &EvalTarget<'a>,
+    invoke: Option<&InvokeParams<'a>>,
     schema: Schema,
     options: EvalOptions,
 ) -> Result<(JsonValue, ExecutionContextId)> {
