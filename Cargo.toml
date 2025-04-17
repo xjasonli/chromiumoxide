@@ -51,7 +51,6 @@ schemars = { version = "1.0.0-alpha.17", features = ["derive"] }
 try-specialize = "0.1"
 async-trait = "0.1"
 rand = "0.8"
-async-scoped = { version = "0.9" }
 erased-serde = "0.4"
 serde_repr = "0.1"
 bitflags = { version = "2" }
@@ -70,8 +69,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 
 [features]
 default = ["async-std-runtime", "bytes"]
-async-std-runtime = ["async-std", "async-tungstenite/async-std-runtime", "async-scoped/use-async-std"]
-tokio-runtime = ["tokio", "async-tungstenite/tokio-runtime", "async-scoped/use-tokio"]
+async-std-runtime = ["async-std", "async-tungstenite/async-std-runtime"]
+tokio-runtime = ["tokio", "async-tungstenite/tokio-runtime"]
 fetcher = []
 bytes = ["dep:bytes"]
 serde0 = []

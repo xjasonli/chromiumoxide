@@ -27,11 +27,15 @@
 use std::sync::Arc;
 use chromiumoxide_cdp::cdp::browser_protocol::page::{AddScriptToEvaluateOnNewDocumentParams, RemoveScriptToEvaluateOnNewDocumentParams, ScriptIdentifier};
 use chromiumoxide_cdp::cdp::js_protocol::runtime::{AddBindingParams, EventBindingCalled, ExecutionContextId};
+use futures::future::BoxFuture;
 use rand::Rng;
 use schemars::Schema;
 use serde_json::Value as JsonValue;
 use std::marker::PhantomData;
 use serde::{Serialize, Deserialize, de::DeserializeSeed};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use crate::error::{CdpError, Result};
 use crate::listeners::EventStream;
@@ -134,8 +138,8 @@ impl<E> ExposableFnError for E where E: std::fmt::Display + std::fmt::Debug + Se
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone)]
-pub struct ExposedFunction<'f>(Arc<ExposedFunctionInner<'f>>);
+#[derive(Debug)]
+pub struct ExposedFunction<'f>(ExposedFunctionInner<'f>);
 
 impl<'f> ExposedFunction<'f> {
     /// Returns the name of the callback as registered in the browser.
@@ -152,7 +156,7 @@ impl<'f> ExposedFunction<'f> {
         for<'a> A: FromJsArgs + 'a,
     {
         let inner = ExposedFunctionInner::new(name, page, callback).await?;
-        Ok(Self(Arc::new(inner)))
+        Ok(Self(inner))
     }
 }
 
@@ -162,14 +166,19 @@ impl<'f> AsRef<str> for ExposedFunction<'f> {
     }
 }
 
-#[cfg(feature = "tokio-runtime")]
-type Scope<'f, T = ()> = async_scoped::TokioScope<'f, T>;
-#[cfg(feature = "async-std-runtime")]
-type Scope<'f, T = ()> = async_scoped::AsyncStdScope<'f, T>;
+impl<'f> Future for ExposedFunction<'f> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        let future = this.0.future.as_mut();
+        future.poll(cx)
+    }
+}
 
 struct ExposedFunctionInner<'f> {
     shared: Arc<Shared<'f>>,
-    _scope: Scope<'f>,
+    future: BoxFuture<'f, ()>,
 }
 
 impl<'f> ExposedFunctionInner<'f> {
@@ -207,16 +216,8 @@ impl<'f> ExposedFunctionInner<'f> {
         });
 
         // Start the event handling scope
-        let (scope, _) = {
-            let shared = shared.clone();
-            unsafe {
-                Scope::scope(move |s| {
-                    s.spawn_cancellable(shared.run(listener), || ())
-                })
-            }
-        };
-
-        Ok(Self { shared, _scope: scope })
+        let future = Box::pin(shared.clone().run(listener));
+        Ok(Self { shared, future })
     }
 
     fn name(&self) -> &str {

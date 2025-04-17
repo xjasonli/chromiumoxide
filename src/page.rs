@@ -1436,35 +1436,38 @@ impl Page {
     /// # use chromiumoxide::error::Result;
     /// # async fn demo(page: &Page) -> Result<()> {
     /// // Expose a simple synchronous function
-    /// page.expose_function(
+    /// let handle = page.expose_function(
     ///     "add",
     ///     |a: i32, b: i32| -> Result<i32, std::convert::Infallible> {
     ///         Ok(a + b)
     ///     }
     /// ).await?;
+    /// tokio::spawn(handle);
     /// 
     /// // Call it from JavaScript
     /// let result = page.eval::<i32>("add(2, 3)").await?;
     /// assert_eq!(result, 5);
     /// 
     /// // Expose an async function
-    /// page.expose_function(
+    /// let handle = page.expose_function(
     ///     "fetchData",
     ///     |url: String| -> Result<String, std::convert::Infallible> {
     ///         Ok(format!("Data from {}", url))
     ///     }
     /// ).await?;
+    /// tokio::spawn(handle);
     /// 
     /// // Call async function from JavaScript
     /// let data = page.eval::<String>("fetchData('example.com')").await?;
     /// 
     /// // Expose a function that handles complex types
-    /// page.expose_function(
+    /// let handle = page.expose_function(
     ///     "processUser",
     ///     |name: String, age: i32| -> Result<String, std::convert::Infallible> {
     ///         Ok(format!("User {} is {} years old", name, age))
     ///     }
     /// ).await?;
+    /// tokio::spawn(handle);
     /// # Ok(())
     /// # }
     /// ```
@@ -1474,7 +1477,8 @@ impl Page {
     /// * `function` - Any Rust function that can be called from JavaScript
     ///
     /// # Returns
-    /// Returns an `ExposedFunction` that represents the exposed function
+    /// Returns an `ExposedFunction` that represents the exposed function handle.
+    /// The function is automatically unregistered when the handle is dropped.
     ///
     /// # Errors
     /// Returns an error if:
