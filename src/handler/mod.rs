@@ -31,7 +31,7 @@ use crate::handler::viewport::Viewport;
 use crate::page::Page;
 
 /// Standard timeout in MS
-pub const REQUEST_TIMEOUT: u64 = 30_000;
+pub const REQUEST_TIMEOUT: u64 = 60_000;
 
 pub mod browser;
 pub mod commandfuture;
