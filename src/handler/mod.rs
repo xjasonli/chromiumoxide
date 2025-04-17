@@ -595,46 +595,53 @@ impl Stream for Handler {
             // temporary pinning of the browser receiver should be safe as we are pinning
             // through the already pinned self. with the receivers we can also
             // safely ignore exhaustion as those are fused.
-            while let Poll::Ready(Some(msg)) = Pin::new(&mut pin.from_browser).poll_next(cx) {
+            while let Poll::Ready(msg) = Pin::new(&mut pin.from_browser).poll_next(cx) {
                 match msg {
-                    HandlerMessage::Command(cmd) => {
-                        pin.submit_external_command(cmd, now)?;
+                    Some(msg) => {
+                        match msg {
+                            HandlerMessage::Command(cmd) => {
+                                pin.submit_external_command(cmd, now)?;
+                            }
+                            HandlerMessage::FetchTargets(tx) => {
+                                pin.submit_fetch_targets(tx, now);
+                            }
+                            HandlerMessage::CloseBrowser(tx) => {
+                                pin.submit_close(tx, now);
+                            }
+                            HandlerMessage::CreatePage(params, tx) => {
+                                pin.create_page(params, tx);
+                            }
+                            HandlerMessage::GetPages(tx) => {
+                                let pages: Vec<_> = pin
+                                    .targets
+                                    .values_mut()
+                                    .filter(|p| p.is_page())
+                                    .filter_map(|target| target.get_or_create_page())
+                                    .map(|page| Page::from(page.clone()))
+                                    .collect();
+                                let _ = tx.send(pages);
+                            }
+                            HandlerMessage::CreateContext(ctx, tx) => {
+                                pin.create_browser_context(ctx, tx)?;
+                            }
+                            HandlerMessage::DisposeContext(ctx, tx) => {
+                                pin.dispose_browser_context(ctx, tx)?;
+                            }
+                            HandlerMessage::GetPage(target_id, tx) => {
+                                let page = pin
+                                    .targets
+                                    .get_mut(&target_id)
+                                    .and_then(|target| target.get_or_create_page())
+                                    .map(|page| Page::from(page.clone()));
+                                let _ = tx.send(page);
+                            }
+                            HandlerMessage::AddEventListener(req) => {
+                                pin.event_listeners.add_listener(req);
+                            }
+                        }
                     }
-                    HandlerMessage::FetchTargets(tx) => {
-                        pin.submit_fetch_targets(tx, now);
-                    }
-                    HandlerMessage::CloseBrowser(tx) => {
-                        pin.submit_close(tx, now);
-                    }
-                    HandlerMessage::CreatePage(params, tx) => {
-                        pin.create_page(params, tx);
-                    }
-                    HandlerMessage::GetPages(tx) => {
-                        let pages: Vec<_> = pin
-                            .targets
-                            .values_mut()
-                            .filter(|p| p.is_page())
-                            .filter_map(|target| target.get_or_create_page())
-                            .map(|page| Page::from(page.clone()))
-                            .collect();
-                        let _ = tx.send(pages);
-                    }
-                    HandlerMessage::CreateContext(ctx, tx) => {
-                        pin.create_browser_context(ctx, tx)?;
-                    }
-                    HandlerMessage::DisposeContext(ctx, tx) => {
-                        pin.dispose_browser_context(ctx, tx)?;
-                    }
-                    HandlerMessage::GetPage(target_id, tx) => {
-                        let page = pin
-                            .targets
-                            .get_mut(&target_id)
-                            .and_then(|target| target.get_or_create_page())
-                            .map(|page| Page::from(page.clone()));
-                        let _ = tx.send(page);
-                    }
-                    HandlerMessage::AddEventListener(req) => {
-                        pin.event_listeners.add_listener(req);
+                    None => {
+                        return Poll::Ready(None);
                     }
                 }
             }
@@ -675,24 +682,31 @@ impl Stream for Handler {
 
             let mut done = true;
 
-            while let Poll::Ready(Some(ev)) = Pin::new(&mut pin.conn).poll_next(cx) {
+            while let Poll::Ready(ev) = Pin::new(&mut pin.conn).poll_next(cx) {
                 match ev {
-                    Ok(Message::Response(resp)) => {
-                        pin.on_response(resp);
-                        if pin.closing {
-                            // handler should stop processing
-                            return Poll::Ready(None);
+                    Some(ev) => {
+                        match ev {
+                            Ok(Message::Response(resp)) => {
+                                pin.on_response(resp);
+                                if pin.closing {
+                                    // handler should stop processing
+                                    return Poll::Ready(None);
+                                }
+                            }
+                            Ok(Message::Event(ev)) => {
+                                pin.on_event(ev);
+                            }
+                            Err(err) => {
+                                tracing::error!("WS Connection error: {:?}", err);
+                                return Poll::Ready(Some(Err(err)));
+                            }
                         }
+                        done = false;
                     }
-                    Ok(Message::Event(ev)) => {
-                        pin.on_event(ev);
-                    }
-                    Err(err) => {
-                        tracing::error!("WS Connection error: {:?}", err);
-                        return Poll::Ready(Some(Err(err)));
+                    None => {
+                        return Poll::Ready(None);
                     }
                 }
-                done = false;
             }
 
             if pin.evict_command_timeout.poll_ready(cx) {
