@@ -13,10 +13,11 @@ js_remote_object!(
             name: String [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Attr/namespaceURI
-            namespace_uri: Option<String> [readonly];
+            #[rename = namespace_uri]
+            namespaceURI: Option<String> [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Attr/ownerElement
-            owner_element: Option<JsElement> [readonly];
+            ownerElement: Option<JsElement> [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/Attr/prefix
             prefix: Option<String> [readonly];

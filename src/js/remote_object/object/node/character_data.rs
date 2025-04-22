@@ -27,10 +27,10 @@ js_remote_object!(
             length: usize [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/nextElementSibling
-            next_element_sibling: Option<JsElement> [readonly];
+            nextElementSibling: Option<JsElement> [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/previousElementSibling
-            previous_element_sibling: Option<JsElement> [readonly];
+            previousElementSibling: Option<JsElement> [readonly];
         }
 
         methods: {

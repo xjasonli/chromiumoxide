@@ -24,10 +24,10 @@ js_remote_object!(
             }
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/firstElementChild
-            first_element_child: Option<JsElement> [readonly];
+            firstElementChild: Option<JsElement> [readonly];
 
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/lastElementChild
-            last_element_child: Option<JsElement> [readonly];
+            lastElementChild: Option<JsElement> [readonly];
         }
         methods: {
             /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append
