@@ -573,7 +573,7 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
         .argument(binding_name)
         .invoke().await?;
 
-    let descriptor = if descriptor.is_none() || descriptor.as_ref().unwrap().value != "function" {
+    let _descriptor = if descriptor.is_none() || descriptor.as_ref().unwrap().value != "function" {
         // Add the cdp binding to the global object
         page.execute(
             AddBindingParams::builder()
@@ -591,19 +591,24 @@ async fn ensure_binding(page: &Arc<PageInner>, binding_name: &str) -> Result<()>
         descriptor.unwrap()
     };
 
-    if descriptor.enumerable {
-        const SET_BINDING_ENUMERABLE: &'static str = js_expr_str!(
-            (name) => {
-                Object.defineProperty(globalThis, name, {
-                    enumerable: false,
-                });
-            }
-        );
-        // Make the cdp binding non-enumerable on the main frame
-        page.invoke_function(SET_BINDING_ENUMERABLE)
-            .argument(binding_name)
-            .invoke::<()>().await?;
-    }
+    // TODO:
+    // 调用时报 "invalid type: map, expected unit" 错误, 可能是被注入页面的 js 函数被污染了, url 例如:
+    // http://www.cnweiming.com/index.aspx?lanmuid=105&sublanmuid=1163&page=1
+    // 后续需要完全解决这个问题
+    //
+    // if descriptor.enumerable {
+    //     const SET_BINDING_ENUMERABLE: &'static str = js_expr_str!(
+    //         (name) => {
+    //             Object.defineProperty(globalThis, name, {
+    //                 enumerable: false,
+    //             });
+    //         }
+    //     );
+    //     // Make the cdp binding non-enumerable on the main frame
+    //     page.invoke_function(SET_BINDING_ENUMERABLE)
+    //         .argument(binding_name)
+    //         .invoke::<()>().await?;
+    // }
     Ok(())
 }
 
