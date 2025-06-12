@@ -54,7 +54,7 @@ macro_rules! js_remote_object {
         }
     ) => {
         paste::paste! {
-            #[derive(Debug, Clone)]
+            #[derive(Debug, Clone, PartialEq, Eq)]
             $(#[$meta])*
             pub struct [< Js $t >]([< Js $parent >]);
 
@@ -67,7 +67,7 @@ macro_rules! js_remote_object {
                     T::downcast_from(Clone::clone(self))
                 }
             }
-
+            
             // implement Deref<Target = Parent> for Self
             impl Deref for [< Js $t >] {
                 type Target = [< Js $parent >];
