@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let (mut browser, mut handler, _process) =
+    let (browser, mut handler, _process) =
         Browser::launch(BrowserConfig::builder().with_head().build()?).await?;
 
     let handle = async_std::task::spawn(async move {
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     page.execute(AddBindingParams::new("testFunc1")).await?;
 
-    page.evaluate("window.testFunc1('30');").await?;
+    let _: () = page.eval("window.testFunc1('30')").await?;
 
     let value = value_from_js.lock().await;
     assert_eq!(*value, "30");
