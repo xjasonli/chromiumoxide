@@ -243,5 +243,5 @@ impl schemars::JsonSchema for JsRemoteVal {
         schema
     }
 
-    fn always_inline_schema() -> bool { true }
+    fn inline_schema() -> bool { true }
 }
