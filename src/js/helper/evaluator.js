@@ -700,8 +700,7 @@
             });
         })();
 
-        function processResult(result) {
-            let config = this;
+        function processResult(config, result) {
             if (config.returnMode === 'null') {
                 return null;
             } else if (config.returnMode === 'undefined') {
@@ -773,8 +772,8 @@
     let { config, processResult, func, args } = $chromiumoxideEvaluatorArguments$;
     const result = func.call(...args);
     if (config.awaitPromise) {
-        return Promise.resolve(result).then(processResult.bind(config));
+        return Promise.resolve(result).then((v) => processResult(config, v));
     } else {
-        return processResult.call(config, result);
+        return processResult(config, result);
     }
 }
