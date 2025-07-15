@@ -1,33 +1,33 @@
 use super::*;
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory>
     class IDBFactory extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBFactory";
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/cmp
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/cmp>
             cmp(first: impl IntoJsAny, second: impl IntoJsAny) -> i32;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases>
             databases() -> Vec<JsIDBDatabaseInfo>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/deleteDatabase
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/deleteDatabase>
             deleteDatabase(name: impl IntoJs<String>) -> JsIDBOpenDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/open
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/open>
             open(name: impl IntoJs<String>) -> JsIDBOpenDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/open
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/open>
             #[rename = + withVersion]
             open(name: impl IntoJs<String>, version: u64) -> JsIDBOpenDBRequest;
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases#return_value
+/// <https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases#return_value>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsIDBDatabaseInfo {
@@ -39,138 +39,138 @@ pub struct JsIDBDatabaseInfo {
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest>
     class IDBOpenDBRequest extends IDBRequest inherits EventTarget, Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBOpenDBRequest";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest/onblocked
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest/onblocked>
             onblocked: Option<JsFunction>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest/onupgradeneeded
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBOpenDBRequest/onupgradeneeded>
             onupgradeneeded: Option<JsFunction>;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest>
     class IDBRequest extends EventTarget inherits Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDB*Request";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/error
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/error>
             error: Option<JsObject> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/onerror
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/onerror>
             onerror: Option<JsFunction>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/onsuccess
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/onsuccess>
             onsuccess: Option<JsFunction>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/readyState
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/readyState>
             readyState: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/result
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/result>
             result: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/source
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/source>
             source: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/transaction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest/transaction>
             transaction: Option<JsIDBTransaction> [readonly];
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction>
     class IDBTransaction extends EventTarget inherits Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBTransaction";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/db
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/db>
             db: JsIDBDatabase [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/durability
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/durability>
             durability: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/error
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/error>
             error: Option<JsObject> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/mode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/mode>
             mode: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/objectStoreNames
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/objectStoreNames>
             objectStoreNames: Vec<String> [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/abort
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/abort>
             abort() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/commit
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/commit>
             commit() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/objectStore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/objectStore>
             objectStore(name: impl IntoJs<String>) -> JsIDBObjectStore;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase>
     class IDBDatabase extends EventTarget inherits Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBDatabase";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/name
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/name>
             name: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/objectStoreNames
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/objectStoreNames>
             objectStoreNames: Vec<String> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/version
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/version>
             version: u64 [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/close
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/close>
             close() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/createObjectStore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/createObjectStore>
             createObjectStore(name: impl IntoJs<String>) -> JsIDBObjectStore;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/createObjectStore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/createObjectStore>
             #[rename = + withOptions]
             createObjectStore(name: impl IntoJs<String>, options: JsIDBObjectStoreParameters) -> JsIDBObjectStore;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/deleteObjectStore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/deleteObjectStore>
             deleteObjectStore(name: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction>
             transaction(storeNames: impl IntoJs<Vec<String>>) -> JsIDBTransaction;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction>
             #[rename = + withMode]
             transaction(storeNames: impl IntoJs<Vec<String>>, mode: impl IntoJs<String>) -> JsIDBTransaction;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction>
             #[rename = + withModeAndOptions]
             transaction(storeNames: impl IntoJs<Vec<String>>, mode: impl IntoJs<String>, options: JsIDBTransactionOptions) -> JsIDBTransaction;
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsIDBObjectStoreParameters {
@@ -183,7 +183,7 @@ pub struct JsIDBObjectStoreParameters {
     pub auto_increment: Option<bool>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsIDBTransactionOptions {
@@ -193,117 +193,117 @@ pub struct JsIDBTransactionOptions {
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore>
     class IDBObjectStore extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBObjectStore";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/autoIncrement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/autoIncrement>
             autoIncrement: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/indexNames
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/indexNames>
             indexNames: Vec<String> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/keyPath
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/keyPath>
             keyPath: Option<String> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/name
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/name>
             name: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/transaction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/transaction>
             transaction: JsIDBTransaction [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/add
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/add>
             add(value: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/add
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/add>
             #[rename = + withKey]
             add(value: impl IntoJsAny, key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/clear
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/clear>
             clear() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/count
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/count>
             count() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/count
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/count>
             #[rename = + withKey]
             count(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex>
             createIndex(name: impl IntoJs<String>, keyPath: impl IntoJsAny) -> JsIDBIndex;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex>
             #[rename = + withOptions]
             createIndex(name: impl IntoJs<String>, keyPath: impl IntoJsAny, options: JsIDBIndexParameters) -> JsIDBIndex;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/delete
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/delete>
             delete(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/deleteIndex
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/deleteIndex>
             deleteIndex(name: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/get
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/get>
             get(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll>
             getAll() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll>
             #[rename = + withKey]
             getAll(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAll>
             #[rename = + withKeyAndCount]
             getAll(key: impl IntoJsAny, count: u32) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys>
             getAllKeys() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys>
             #[rename = + withKey]
             getAllKeys(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getAllKeys>
             #[rename = + withKeyAndCount]
             getAllKeys(key: impl IntoJsAny, count: u32) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getKey
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/getKey>
             getKey(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/index
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/index>
             index(name: impl IntoJs<String>) -> JsIDBIndex;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor>
             openCursor() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor>
             #[rename = + withKey]
             openCursor(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openCursor>
             #[rename = + withKeyAndDirection]
             openCursor(key: impl IntoJsAny, direction: impl IntoJs<String>) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor>
             openKeyCursor() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor>
             #[rename = + withKey]
             openKeyCursor(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/openKeyCursor>
             #[rename = + withKeyAndDirection]
             openKeyCursor(key: impl IntoJsAny, direction: impl IntoJs<String>) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/put
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/put>
             put(value: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/put
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/put>
             #[rename = + withKey]
             put(value: impl IntoJsAny, key: impl IntoJsAny) -> JsIDBRequest;
         }
@@ -311,91 +311,91 @@ js_remote_object!{
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex>
     class IDBIndex extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "IDBIndex";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/keyPath
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/keyPath>
             keyPath: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/multiEntry
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/multiEntry>
             multiEntry: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/name
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/name>
             name: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/objectStore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/objectStore>
             objectStore: JsIDBObjectStore [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/unique
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/unique>
             unique: bool [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/count
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/count>
             count() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/count
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/count>
             #[rename = + withKey]
             count(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/get
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/get>
             get(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll>
             getAll() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll>
             #[rename = + withKey]
             getAll(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll>
             #[rename = + withKeyAndCount]
             getAll(key: impl IntoJsAny, count: u32) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys>
             getAllKeys() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys>
             #[rename = + withKey]
             getAllKeys(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllKeys>
             #[rename = + withKeyAndCount]
             getAllKeys(key: impl IntoJsAny, count: u32) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getKey
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getKey>
             getKey(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor>
             openCursor() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor>
             #[rename = + withKey]
             openCursor(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openCursor>
             #[rename = + withKeyAndDirection]
             openCursor(key: impl IntoJsAny, direction: impl IntoJs<String>) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor>
             openKeyCursor() -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor>
             #[rename = + withKey]
             openKeyCursor(key: impl IntoJsAny) -> JsIDBRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/openKeyCursor>
             #[rename = + withKeyAndDirection]
             openKeyCursor(key: impl IntoJsAny, direction: impl IntoJs<String>) -> JsIDBRequest;
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/createIndex#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsIDBIndexParameters {

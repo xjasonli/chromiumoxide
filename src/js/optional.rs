@@ -80,7 +80,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Converts to Option<&T>
+    /// Converts to Option&lt;&T&gt;
     pub fn as_option(&self) -> Option<&T> {
         match self {
             Self::None => None,
@@ -88,7 +88,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Converts to Option<T>
+    /// Converts to Option&lt;T&gt;
     pub fn into_option(self) -> Option<T> {
         match self {
             Self::None => None,
@@ -128,7 +128,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Maps an Optional<T> to Optional<U> by applying a function to the contained value
+    /// Maps an Optional&lt;T&gt; to Optional&lt;U&gt; by applying a function to the contained value
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Optional<U> {
         match self {
             Self::None => Optional::None,
@@ -136,7 +136,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Maps an Optional<T> to Optional<U> by applying a function to a reference of the contained value
+    /// Maps an Optional&lt;T&gt; to Optional&lt;U&gt; by applying a function to a reference of the contained value
     pub fn map_ref<U, F: FnOnce(&T) -> U>(&self, f: F) -> Optional<U> {
         match self {
             Self::None => Optional::None,
@@ -180,7 +180,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Transforms the Optional<T> into a Result<T, E>
+    /// Transforms the Optional&lt;T&gt; into a Result&lt;T, E&gt;
     pub fn ok_or<E>(self, err: E) -> Result<T, E> {
         match self {
             Self::None => Err(err),
@@ -188,7 +188,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Transforms the Optional<T> into a Result<T, E> by mapping the error
+    /// Transforms the Optional&lt;T&gt; into a Result&lt;T, E&gt; by mapping the error
     pub fn ok_or_else<E, F: FnOnce() -> E>(self, err: F) -> Result<T, E> {
         match self {
             Self::None => Err(err()),
@@ -196,7 +196,7 @@ impl<T> Optional<T> {
         }
     }
 
-    /// Zips two optionals together into an optional tuple
+    /// Zips two optionals together into an Optional tuple
     pub fn zip<U>(self, other: Optional<U>) -> Optional<(T, U)> {
         match (self, other) {
             (Self::Some(t), Optional::Some(u)) => Optional::Some((t, u)),

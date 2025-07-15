@@ -9,7 +9,7 @@ pub use comment::*;
 pub use processing_instruction::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData>
     class CharacterData extends Node inherits Object {
         static #class: [
             "CharacterData",
@@ -20,75 +20,75 @@ js_remote_object!(
         ];
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/data
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/data>
             data: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/length
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/length>
             length: usize [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/nextElementSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/nextElementSibling>
             nextElementSibling: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/previousElementSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/previousElementSibling>
             previousElementSibling: Option<JsElement> [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/after
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/after>
             after<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/after
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/after>
             #[rename = +text]
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/appendData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/appendData>
             appendData(data: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/before
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/before>
             before<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/before
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/before>
             #[rename = +text]
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/deleteData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/deleteData>
             deleteData(offset: usize, count: usize) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/insertData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/insertData>
             insertData(offset: usize, data: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/remove
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/remove>
             remove() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceData>
             replaceData(offset: usize, count: usize, data: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceWith
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceWith>
             replaceWith<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceWith
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/replaceWith>
             #[rename = +text]
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/substringData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CharacterData/substringData>
             substringData(offset: usize, count: usize) -> String;
         }
     }

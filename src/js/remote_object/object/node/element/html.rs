@@ -33,136 +33,136 @@ pub use table_section::*;
 pub use text_area::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement>
     class HtmlElement extends Element inherits Node, Object {
         static #class: "HTML*";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/accessKey
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/accessKey>
             accessKey: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/accessKeyLabel
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/accessKeyLabel>
             accessKeyLabel: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/attributeStyleMap
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/attributeStyleMap>
             attributeStyleMap: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autocapitalize
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autocapitalize>
             autocapitalize: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autofocus
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autofocus>
             autofocus: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autocorrect
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/autocorrect>
             autocorrect: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/contentEditable
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/contentEditable>
             contentEditable: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset>
             dataset: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dir
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dir>
             dir: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/draggable
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/draggable>
             draggable: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/editContext
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/editContext>
             editContext: Option<JsObject> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/enterKeyHint
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/enterKeyHint>
             enterKeyHint: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidden
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidden>
             hidden: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inert
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inert>
             inert: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/innerText
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/innerText>
             innerText: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inputMode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inputMode>
             inputMode: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/isContentEditable
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/isContentEditable>
             isContentEditable: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/lang
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/lang>
             lang: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/nonce
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/nonce>
             nonce: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight>
             offsetHeight: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetLeft
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetLeft>
             offsetLeft: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetParent
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetParent>
             offsetParent: Option<JsHtmlElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop>
             offsetTop: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetWidth
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetWidth>
             offsetWidth: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText>
             outerText: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/popover
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/popover>
             popover: String;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/spellcheck
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/spellcheck>
             spellcheck: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/style
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/style>
             style: JsCssStyleDeclaration;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/tabIndex
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/tabIndex>
             tabIndex: i32;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/title
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/title>
             title: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/translate
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/translate>
             translate: bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/virtualKeyboardPolicy
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/virtualKeyboardPolicy>
             virtualKeyboardPolicy: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/writingSuggestions
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/writingSuggestions>
             writingSuggestions: String;
         }
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/attachInternals
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/attachInternals>
             attachInternals() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/blur
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/blur>
             blur() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/click
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/click>
             click() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus>
             focus(options?: JsFocusOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidePopover
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidePopover>
             hidePopover() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/showPopover
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/showPopover>
             showPopover() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/togglePopover
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/togglePopover>
             togglePopover(force: bool) -> bool;
         }
     }
 );
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#options>
 #[derive(Default, Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]

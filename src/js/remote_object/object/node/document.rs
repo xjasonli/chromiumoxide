@@ -5,24 +5,24 @@ pub mod html;
 pub use html::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Document
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Document>
     class Document extends Node inherits Object {
         static #class: ["HTMLDocument", "XMLDocument"];
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/activeElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/activeElement>
             activeElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/body
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/body>
             body: Option<JsHtmlElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/characterSet
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/characterSet>
             characterSet: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/childElementCount
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/childElementCount>
             childElementCount: usize [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/children
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/children>
             children: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -32,26 +32,26 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/compatMode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/compatMode>
             compatMode: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/contentType
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/contentType>
             contentType: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/currentScript
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/currentScript>
             currentScript: Option<JsHtmlElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/doctype
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/doctype>
             doctype: Option<JsDocumentType> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/documentElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/documentElement>
             documentElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/documentURI
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/documentURI>
             #[rename = document_uri]
             documentURI: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/embeds
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/embeds>
             embeds: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -61,13 +61,13 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/firstElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/firstElementChild>
             firstElementChild: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/fonts
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/fonts>
             fonts: JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/forms
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/forms>
             forms: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -77,19 +77,19 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/fragmentDirective
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/fragmentDirective>
             fragmentDirective: Option<JsObject> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/fullscreenElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/fullscreenElement>
             fullscreenElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/head
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/head>
             head: Option<JsHtmlElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/hidden
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/hidden>
             hidden: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/images
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/images>
             images: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -99,13 +99,13 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/implementation
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/implementation>
             implementation: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/lastElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/lastElementChild>
             lastElementChild: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/links
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/links>
             links: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -115,13 +115,13 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/pictureInPictureElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/pictureInPictureElement>
             pictureInPictureElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/pictureInPictureEnabled
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/pictureInPictureEnabled>
             pictureInPictureEnabled: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/plugins
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/plugins>
             plugins: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -131,13 +131,13 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/pointerLockElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/pointerLockElement>
             pointerLockElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/prerendering
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/prerendering>
             prerendering: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/scripts
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/scripts>
             scripts: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -147,108 +147,108 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/scrollingElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/scrollingElement>
             scrollingElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/stylesheets
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/stylesheets>
             styleSheets: Vec<JsCssStyleSheet> [readonly] {
                 get() {
                     return Array.from(this.styleSheets);
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/timeline
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/timeline>
             timeline: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState>
             visibilityState: String [readonly];
         }
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/adoptNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/adoptNode>
             adoptNode<T: IntoJs<JsNode>>(node: T) -> T::FromJs;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/append>
             append<'a, I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/append>
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/caretPositionFromPoint
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/caretPositionFromPoint>
             caretPositionFromPoint(x: f64, y: f64) -> Option<JsObject>;
             #[rename = +withShadowRoots]
             caretPositionFromPoint(x: f64, y: f64, shadow_roots: &[JsShadowRoot]) -> Option<JsObject>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createAttribute>
             createAttribute(name: &str) -> JsAttr;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createAttributeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createAttributeNS>
             #[rename = create_attribute_ns]
             createAttributeNS(namespace_uri: &str, qualified_name: &str) -> JsAttr;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createCDATASection
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createCDATASection>
             #[rename = create_cdata_section]
             createCDATASection(data: &str) -> JsCdataSection;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createComment
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createComment>
             createComment(data: &str) -> JsComment;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createDocumentFragment
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createDocumentFragment>
             createDocumentFragment() -> JsDocumentFragment;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement>
             createElement(tag_name: &str) -> JsElement;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS>
             #[rename = create_element_ns]
             createElementNS(namespace_uri: &str, qualified_name: &str) -> JsElement;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createNodeIterator
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createNodeIterator>
             createNodeIterator<T: IntoJs<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createProcessingInstruction
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createProcessingInstruction>
             createProcessingInstruction(
                 target: impl IntoJs<String>,
                 data: impl IntoJs<String>,
             ) -> JsProcessingInstruction;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createRange
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createRange>
             createRange() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTextNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createTextNode>
             createTextNode(data: &str) -> JsText;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker>
             createTreeWalker<T: IntoJs<JsNode>>(root: T, what_to_show: Option<JsNodeFilter>) -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/elementFromPoint
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/elementFromPoint>
             elementFromPoint(x: u32, y: u32) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/elementsFromPoint
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/elementsFromPoint>
             elementsFromPoint(x: u32, y: u32) -> Vec<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/exitFullscreen
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/exitFullscreen>
             exitFullscreen() -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/exitPictureInPicture
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/exitPictureInPicture>
             exitPictureInPicture() -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/exitPointerLock
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/exitPointerLock>
             exitPointerLock() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getAnimations
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getAnimations>
             getAnimations() -> Vec<JsObject>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById>
             getElementById(id: &str) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName>
             getElementsByClassName(name: &str) -> JsHtmlCollection;
 
             /// Extension method
@@ -256,7 +256,7 @@ js_remote_object!(
                 return Array.from(this.getElementsByClassName(name));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagName>
             getElementsByTagName(name: &str) -> JsHtmlCollection;
 
             /// Extension method
@@ -264,7 +264,7 @@ js_remote_object!(
                 return Array.from(this.getElementsByTagName(name));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagNameNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagNameNS>
             #[rename = get_elements_by_tag_name_ns]
             getElementsByTagNameNS(namespace: &str, name: &str) -> JsHtmlCollection;
 
@@ -274,66 +274,66 @@ js_remote_object!(
                 return Array.from(this.getElementsByTagNameNS(namespace, name));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/getSelection
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/getSelection>
             getSelection() -> Option<JsObject>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/hasStorageAccess
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/hasStorageAccess>
             hasStorageAccess() -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/hasUnpartitionedCookieAccess
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/hasUnpartitionedCookieAccess>
             hasUnpartitionedCookieAccess() -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/importNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/importNode>
             importNode<T: IntoJs<JsNode>>(node: T, deep: bool) -> T::FromJs;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend>
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/prepend>
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector>
             querySelector(selectors: impl IntoJs<String>) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll>
             querySelectorAll(selectors: impl IntoJs<String>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/replaceChildren>
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/replaceChildren>
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess>
             requestStorageAccess(options?: &JsRequestStorageAccessOptions) -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccessFor
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccessFor>
             requestStorageAccessFor(origin: impl IntoJs<String>) -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition>
             startViewTransition(callback: Option<&JsFunction>) -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createExpression
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/createExpression>
             createExpression(xpath: impl IntoJs<String>) -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate>
             evaluate<T: IntoJs<JsNode>>(
                 xpath: impl IntoJs<String>,
                 context_node: T,
@@ -393,7 +393,7 @@ bitflags::bitflags! {
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess#types
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess#types>
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -447,7 +447,7 @@ pub struct JsRequestStorageAccessOptions {
     pub shared_worker: Option<bool>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/XPathResult#constants
+/// <https://developer.mozilla.org/en-US/docs/Web/API/XPathResult#constants>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, schemars::JsonSchema_repr)]
 #[repr(u16)]

@@ -202,8 +202,8 @@ impl Browser {
     /// Request for the browser to close completely.
     ///
     /// If the browser was spawned by [`Browser::launch`], it is recommended to wait for the
-    /// spawned instance exit, to avoid "zombie" processes ([`Browser::wait`],
-    /// [`Browser::wait_sync`], [`Browser::try_wait`]).
+    /// spawned instance exit, to avoid "zombie" processes ([`Child::wait`],
+    /// [`Child::try_wait`]).
     /// [`Browser::drop`] waits automatically if needed.
     pub async fn close(&self) -> Result<CloseReturns> {
         let (tx, rx) = oneshot_channel();
@@ -520,7 +520,7 @@ pub enum HeadlessMode {
     /// The old headless mode.
     #[default]
     True,
-    /// The new headless mode. See also: https://developer.chrome.com/docs/chromium/new-headless
+    /// The new headless mode. See also: <https://developer.chrome.com/docs/chromium/new-headless>
     New,
 }
 
@@ -547,7 +547,7 @@ pub struct BrowserConfig {
     /// CRX files cannot be used directly and must be first extracted.
     ///
     /// Note that Chrome does not support loading extensions in headless-mode.
-    /// See https://bugs.chromium.org/p/chromium/issues/detail?id=706008#c5
+    /// See <https://bugs.chromium.org/p/chromium/issues/detail?id=706008#c5>
     extensions: Vec<String>,
 
     /// Environment variables to set for the Chromium process.
@@ -980,7 +980,7 @@ pub fn default_executable() -> Result<std::path::PathBuf, String> {
 }
 
 /// These are passed to the Chrome binary by default.
-/// Via https://github.com/puppeteer/puppeteer/blob/4846b8723cf20d3551c0d755df394cc5e0c82a94/src/node/Launcher.ts#L157
+/// Via <https://github.com/puppeteer/puppeteer/blob/4846b8723cf20d3551c0d755df394cc5e0c82a94/src/node/Launcher.ts#L157>
 static DEFAULT_ARGS: [&str; 25] = [
     "--disable-background-networking",
     "--enable-features=NetworkService,NetworkServiceInProcess",

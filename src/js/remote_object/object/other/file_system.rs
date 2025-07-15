@@ -1,80 +1,80 @@
 use super::*;
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle>
     class FileSystemHandle extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "FileSystemHandle";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/kind
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/kind>
             kind: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/name
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/name>
             name: String [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/isSameEntry
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemHandle/isSameEntry>
             isSameEntry(other: impl IntoJs<JsFileSystemHandle>) -> bool;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle>
     class FileSystemFileHandle extends FileSystemHandle inherits Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "FileSystemFileHandle";
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/getFile
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/getFile>
             getFile() -> JsFile;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/createWritable
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/createWritable>
             createWritable() -> JsWritableStream;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle>
     class FileSystemDirectoryHandle extends FileSystemHandle inherits Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "FileSystemDirectoryHandle";
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle>
             getDirectoryHandle(name: impl IntoJs<String>) -> JsFileSystemDirectoryHandle;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle>
             #[rename = + withOptions]
             getDirectoryHandle(name: impl IntoJs<String>, options: JsFileSystemGetHandleOptions) -> JsFileSystemDirectoryHandle;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getFileHandle
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getFileHandle>
             getFileHandle(name: impl IntoJs<String>) -> JsFileSystemFileHandle;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getFileHandle
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getFileHandle>
             #[rename = + withOptions]
             getFileHandle(name: impl IntoJs<String>, options: JsFileSystemGetHandleOptions) -> JsFileSystemFileHandle;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry>
             removeEntry(name: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry>
             #[rename = + withOptions]
             removeEntry(name: impl IntoJs<String>, options: JsFileSystemRemoveOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/resolve
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/resolve>
             resolve(possibleDescendant: impl IntoJs<JsFileSystemHandle>) -> Option<Vec<String>>;
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/getDirectoryHandle#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsFileSystemGetHandleOptions {
@@ -83,7 +83,7 @@ pub struct JsFileSystemGetHandleOptions {
     pub create: Option<bool>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/removeEntry#parameters>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]

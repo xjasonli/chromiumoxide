@@ -1,7 +1,7 @@
 use super::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Event
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Event>
     class Event extends Object {
         static #type: "object";
         static #subtype: "other";
@@ -70,52 +70,52 @@ js_remote_object!(
             "XMLHttpRequestProgressEvent",
         ];
 
-        // https://developer.mozilla.org/en-US/docs/Web/API/Event#instance_properties
+        // <https://developer.mozilla.org/en-US/docs/Web/API/Event#instance_properties>
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/bubbles
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/bubbles>
             bubbles: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/cancelable
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/cancelable>
             cancelable: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/composed
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/composed>
             composed: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget>
             currentTarget: Option<JsEventTarget> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/defaultPrevented
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/defaultPrevented>
             defaultPrevented: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/eventPhase
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/eventPhase>
             eventPhase: u16 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/target
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/target>
             target: Option<JsEventTarget> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/timeStamp
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/timeStamp>
             timeStamp: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/type
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/type>
             #[rename = typ]
             type: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted>
             isTrusted: bool [readonly];
         }
 
-        // https://developer.mozilla.org/en-US/docs/Web/API/Event#instance_methods
+        // <https://developer.mozilla.org/en-US/docs/Web/API/Event#instance_methods>
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/composedPath
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/composedPath>
             composedPath() -> Vec<JsEventTarget>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault>
             preventDefault() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/stopImmediatePropagation
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/stopImmediatePropagation>
             stopImmediatePropagation() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation>
             stopPropagation() -> ();
         }
     }

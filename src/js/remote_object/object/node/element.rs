@@ -12,25 +12,25 @@ pub use svg::*;
 pub use math_ml::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Element
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Element>
     class Element extends Node inherits Object {
         static #class: "*Element";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/assignedSlot
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/assignedSlot>
             assignedSlot: Option<JsHtmlElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/attributes
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/attributes>
             attributes: Vec<JsAttr> [readonly] {
                 get() {
                     Array.from(this.attributes)
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/childElementCount
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/childElementCount>
             childElementCount: usize [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/children
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/children>
             children: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -40,179 +40,173 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/classList
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/classList>
             classList: JsObject [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/className
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/className>
             className: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/clientHeight
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/clientHeight>
             clientHeight: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/clientLeft
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/clientLeft>
             clientLeft: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/clientTop
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/clientTop>
             clientTop: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/clientWidth
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/clientWidth>
             clientWidth: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/currentCSSZoom
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/currentCSSZoom>
             #[rename = current_css_zoom]
             currentCSSZoom: f64 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/elementTiming
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/elementTiming>
             elementTiming: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/firstElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/firstElementChild>
             firstElementChild: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/id
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/id>
             id: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML>
             #[rename = inner_html]
             innerHTML: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/lastElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/lastElementChild>
             lastElementChild: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/localName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/localName>
             localName: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/namespaceURI
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/namespaceURI>
             #[rename = namespace_uri]
             namespaceURI: Option<String> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/nextElementSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/nextElementSibling>
             nextElementSibling: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/outerHTML
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/outerHTML>
             #[rename = outer_html]
             outerHTML: String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/part
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/part>
             part: JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/prefix
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/prefix>
             prefix: Option<String> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/previousElementSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/previousElementSibling>
             previousElementSibling: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollHeight
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollHeight>
             scrollHeight: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollLeft
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollLeft>
             scrollLeft: f64;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTop
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTop>
             scrollTop: f64;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollWidth
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollWidth>
             scrollWidth: u32 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/shadowRoot
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/shadowRoot>
             shadowRoot: Option<JsShadowRoot> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/slot
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/slot>
             slot: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/tagName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/tagName>
             tagName: String [readonly];
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/textContent
-            textContent: String;
-
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/title
-            title: String;
         }
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/after
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/after>
             after<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/after
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/after>
             #[rename = +text]
             after<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/animate
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/animate>
             animate(keyframes: &[JsKeyframe], duration: u32) -> JsObject;
 
             #[rename = +withOptions]
             animate(keyframes: &[JsKeyframe], options: &JsAnimateOptions) -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/append>
             append<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/append>
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow>
             attachShadow(options: &JsAttachShadowOptions) -> JsShadowRoot;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/before
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/before>
             before<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/before
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/before>
             #[rename = +text]
             before<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility>
             checkVisibility(options: &JsCheckVisibilityOptions) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/closest>
             closest(selectors: &str) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/computedStyleMap
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/computedStyleMap>
             computedStyleMap() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAnimations
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAnimations>
             getAnimations(subtree: bool) -> Vec<JsObject>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute>
             getAttribute(attribute_name: &str) -> Option<String>;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNames
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNames>
             getAttributeNames() -> Vec<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNode>
             getAttributeNode(attr_name: &str) -> Option<JsAttr>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNodeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNodeNS>
             #[rename = get_attribute_node_ns]
             getAttributeNodeNS(namespace: &str, node_name: &str) -> Option<JsAttr>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNS>
             #[rename = get_attribute_ns]
             getAttributeNS(namespace: &str, name: &str) -> Option<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect>
             getBoundingClientRect() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRects
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getClientRects>
             getClientRects() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByClassName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByClassName>
             getElementsByClassName(names: &str) -> JsHtmlCollection;
 
             /// Extension method
@@ -220,7 +214,7 @@ js_remote_object!(
                 return Array.from(this.getElementsByClassName(names));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByTagName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByTagName>
             getElementsByTagName(tag_name: &str) -> JsHtmlCollection;
 
             /// Extension method
@@ -228,7 +222,7 @@ js_remote_object!(
                 return Array.from(this.getElementsByTagName(tag_name));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByTagNameNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getElementsByTagNameNS>
             #[rename = get_elements_by_tag_name_ns]
             getElementsByTagNameNS(namespace_uri: &str, local_name: &str) -> JsHtmlCollection;
 
@@ -238,150 +232,150 @@ js_remote_object!(
                 return Array.from(this.getElementsByTagNameNS(namespace_uri, local_name));
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/getHTML
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getHTML>
             #[rename = get_html]
             getHTML(options: &JsGetHTMLOptions) -> String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttribute>
             hasAttribute(attribute_name: &str) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttributeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttributeNS>
             #[rename = has_attribute_ns]
             hasAttributeNS(namespace: &str, local_name: &str) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttributes
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/hasAttributes>
             hasAttributes() -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/hasPointerCapture
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/hasPointerCapture>
             hasPointerCapture(pointer_id: i32) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentElement>
             insertAdjacentElement(position: &str, element: &JsElement) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentHTML
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentHTML>
             #[rename = insert_adjacent_html]
             insertAdjacentHTML(position: &str, html: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentText
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentText>
             insertAdjacentText(position: &str, text: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/matches
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/matches>
             matches(selectors: &str) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/prepend>
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/prepend>
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector>
             querySelector(selectors: &str) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll>
             querySelectorAll(selectors: &str) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/releasePointerCapture
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/releasePointerCapture>
             releasePointerCapture(pointer_id: i32) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/remove>
             remove() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttribute>
             removeAttribute(attribute_name: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttributeNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttributeNode>
             removeAttributeNode(attr: &JsAttr) -> JsAttr;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttributeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/removeAttributeNS>
             #[rename = remove_attribute_ns]
             removeAttributeNS(namespace: &str, attr_name: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren>
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren>
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith>
             replaceWith<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceWith>
             #[rename = +text]
             replaceWith<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen>
             requestFullscreen(options: &JsRequestFullscreenOptions) -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock>
             requestPointerLock() -> JsPromise;
             #[rename = +withOptions]
             requestPointerLock(options: &JsRequestPointerLockOptions) -> JsPromise;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll>
             scroll(x: f64, y: f64) -> ();
             #[rename = +withOptions]
             scroll(options: &JsScrollOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollBy
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollBy>
             scrollBy(x: f64, y: f64) -> ();
             #[rename = +withOptions]
             scrollBy(options: &JsScrollOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView>
             scrollIntoView(align_to_top?: bool) -> ();
             #[rename = +withOptions]
             scrollIntoView(options: &JsScrollIntoViewOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTo
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTo>
             scrollTo(x: f64, y: f64) -> ();
             #[rename = +withOptions]
             scrollTo(options: &JsScrollOptions) -> ();
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute>
             setAttribute(name: &str, value: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNode>
             setAttributeNode(attr: &JsAttr) -> Option<JsAttr>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNodeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNodeNS>
             #[rename = set_attribute_node_ns]
             setAttributeNodeNS(attr: &JsAttr) -> Option<JsAttr>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNS
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttributeNS>
             #[rename = set_attribute_ns]
             setAttributeNS(namespace: &str, name: &str, value: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setHTMLUnsafe
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setHTMLUnsafe>
             #[rename = set_html_unsafe]
             setHTMLUnsafe(html: &str) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture>
             setPointerCapture(pointer_id: i32) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Element/toggleAttribute
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Element/toggleAttribute>
             toggleAttribute(name: &str, force?: bool) -> bool;
 
             /// Extension
@@ -547,7 +541,7 @@ impl JsElement {
 
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API/Keyframe_Formats
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API/Keyframe_Formats>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -589,7 +583,7 @@ pub struct JsKeyframe {
     pub properties: HashMap<String, String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/getKeyframes#property_value_pairs
+/// <https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/getKeyframes#property_value_pairs>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -623,7 +617,7 @@ pub struct JsComputedKeyframe {
     pub properties: HashMap<String, String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/KeyframeEffect#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/KeyframeEffect/KeyframeEffect#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -693,7 +687,7 @@ pub struct JsKeyframeEffectOptions {
     pub pseudo_element: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/animate#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/animate#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -728,7 +722,7 @@ pub struct JsAnimateOptions {
     pub effect_options: JsKeyframeEffectOptions,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -779,21 +773,21 @@ pub struct JsAttachShadowOptions {
     /// This can be one of:
     ///
     /// * named
-    /// Elements are automatically assigned to <slot> elements within this
+    /// Elements are automatically assigned to &lt;slot&gt; elements within this
     /// shadow root. Any descendants of the host with a slot attribute which
-    /// matches the name attribute of a <slot> within this shadow root will be
+    /// matches the name attribute of a &lt;slot&gt; within this shadow root will be
     /// assigned to that slot. Any top-level children of the host with no slot
-    /// attribute will be assigned to a <slot> with no name attribute (the
+    /// attribute will be assigned to a &lt;slot&gt; with no name attribute (the
     /// "default slot") if one is present.
     ///
     /// * manual
-    /// Elements are not automatically assigned to <slot> elements. Instead,
+    /// Elements are not automatically assigned to &lt;slot&gt; elements. Instead,
     /// they must be manually assigned with HTMLSlotElement.assign().
     #[serde(rename = "slotAssignment")]
     pub slot_assignment: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -826,7 +820,7 @@ pub struct JsCheckVisibilityOptions {
     pub check_visibility_css: Option<bool>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/getHTML#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/getHTML#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -842,7 +836,7 @@ pub struct JsGetHTMLOptions {
     pub shadow_roots: Option<Vec<JsShadowRoot>>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -873,7 +867,7 @@ pub struct JsRequestFullscreenOptions {
     pub screen: Option<JsObject>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -885,7 +879,7 @@ pub struct JsRequestPointerLockOptions {
     pub unadjusted_movement: Option<bool>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll#options>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -915,7 +909,7 @@ pub struct JsScrollOptions {
     pub behavior: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#scrollintoviewoptions
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#scrollintoviewoptions>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]

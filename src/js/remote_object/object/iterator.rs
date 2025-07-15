@@ -1,48 +1,48 @@
 use super::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator>
     class Iterator extends Object {
         static #type: "object";
         static #subtype: ["iterator", "generator"];
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#next
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#next>
             next<T: FromJsAny>() -> JsIteratorResult<T>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/drop
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/drop>
             drop(limit: u32) -> Self;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/every
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/every>
             every(callback: impl IntoJs<JsFunction>) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/filter
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/filter>
             filter(callback: impl IntoJs<JsFunction>) -> Self;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/find
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/find>
             find<T: FromJsAny>(callback: impl IntoJs<JsFunction>) -> Optional<T>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/flatMap
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/flatMap>
             flatMap(callback: impl IntoJs<JsFunction>) -> Self;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/forEach
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/forEach>
             forEach(callback: impl IntoJs<JsFunction>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/map
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/map>
             map(callback: impl IntoJs<JsFunction>) -> Self;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/reduce
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/reduce>
             reduce<T>(callback: impl IntoJs<JsFunction>, initial_value?: T) -> Optional<T>
             where
                 T: IntoJsAny + FromJsAny;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/some
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/some>
             some(callback: impl IntoJs<JsFunction>) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/take
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/take>
             take(limit: u32) -> Self;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/toArray
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator/toArray>
             toArray() -> JsArray;
 
             /// Extension method

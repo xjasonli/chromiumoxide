@@ -1,6 +1,6 @@
 use super::*;
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsIdleRequestOptions {
@@ -9,7 +9,7 @@ pub struct JsIdleRequestOptions {
     pub timeout: Option<u32>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsScrollToOptions {
@@ -26,7 +26,7 @@ pub struct JsScrollToOptions {
     pub behavior: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsDirectoryPickerOptions {
@@ -43,7 +43,7 @@ pub struct JsDirectoryPickerOptions {
     pub mode: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsOpenFilePickerOptions {
@@ -68,7 +68,7 @@ pub struct JsOpenFilePickerOptions {
     pub types: Option<Vec<JsFilePickerAcceptType>>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsSaveFilePickerOptions {
@@ -93,7 +93,7 @@ pub struct JsSaveFilePickerOptions {
     pub types: Option<Vec<JsFilePickerAcceptType>>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsFilePickerAcceptType {
@@ -106,7 +106,7 @@ pub struct JsFilePickerAcceptType {
     pub accept: std::collections::HashMap<String, Vec<String>>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/structuredClone#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/structuredClone#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsStructuredSerializeOptions {

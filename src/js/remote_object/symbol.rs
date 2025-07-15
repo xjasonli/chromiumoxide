@@ -1,7 +1,7 @@
 use super::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol>
     class Symbol {
         static #type: "symbol";
 

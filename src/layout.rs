@@ -1,4 +1,4 @@
-//! Code based on [rust-headless-chrome](https://github.com/atroche/rust-headless-chrome/blob/master/src/browser/tab/element/box_model.rs)
+//! Code based on [rust-headless-chrome](<https://github.com/atroche/rust-headless-chrome/blob/master/src/browser/tab/element/box_model.rs>)
 
 use chromiumoxide_cdp::cdp::browser_protocol::dom::Quad;
 use chromiumoxide_cdp::cdp::browser_protocol::input::{
@@ -106,7 +106,7 @@ impl ElementQuad {
         }
     }
     /// Compute sum of all directed areas of adjacent triangles
-    /// https://en.wikipedia.org/wiki/Polygon#Simple_polygons
+    /// <https://en.wikipedia.org/wiki/Polygon#Simple_polygons>
     pub fn quad_area(&self) -> f64 {
         let area = self.top_left.area(&self.top_right)
             + self.top_right.area(&self.bottom_right)

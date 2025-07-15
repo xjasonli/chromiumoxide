@@ -42,17 +42,17 @@ pub use wasm_memory::*;
 pub use wasm_value::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+    /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object>
     class Object {
         static #type: ["object", "function"];
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor>
             constructor: JsFunction [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign>
             object_assign<I, T>(...sources: I) -> Self
             where
                 I: IntoIterator<Item = T>,
@@ -60,70 +60,70 @@ js_remote_object!(
                 return Object.assign(this, ...sources);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperties
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperties>
             /// 
             defineProperties<T: IntoJsAny>(properties: T) -> Self {
                 return Object.defineProperties(this, properties);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty>
             defineProperty<T: IntoJsAny>(key: String, descriptor: T) -> Self {
                 return Object.defineProperty(this, key, descriptor);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries>
             object_entries<T: FromJsAny>() -> Vec<(String, T)> {
                 return Object.entries(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyDescriptor
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyDescriptor>
             getOwnPropertyDescriptor<T: FromJsAny>(key: impl IntoJs<String>) -> Option<T> {
                 return Object.getOwnPropertyDescriptor(this, key);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames>
             getOwnPropertyNames() -> Vec<String> {
                 return Object.getOwnPropertyNames(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertySymbols
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertySymbols>
             getOwnPropertySymbols() -> Vec<JsSymbol> {
                 return Object.getOwnPropertySymbols(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getPrototypeOf
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getPrototypeOf>
             getPrototypeOf() -> JsObject {
                 return Object.getPrototypeOf(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn>
             object_hasOwn(key: impl IntoJs<String>) -> bool {
                 return Object.hasOwn(this, key);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys>
             object_keys() -> Vec<String> {
                 return Object.keys(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/values
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/values>
             object_values<T: FromJsAny>() -> Vec<T> {
                 return Object.values(this);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwnProperty
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwnProperty>
             hasOwnProperty(key: impl IntoJs<String>) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/isPrototypeOf
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/isPrototypeOf>
             isPrototypeOf(value: &JsObject) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/propertyIsEnumerable
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/propertyIsEnumerable>
             propertyIsEnumerable(key: JsPropertyName) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString>
             toString() -> String;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/valueOf
+            /// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/valueOf>
             valueOf() -> Self;
         }
     }
@@ -173,7 +173,7 @@ pub struct JsAccessorDescriptor {
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget>
     class EventTarget extends Object {
         static #type: "object";
         static #subtypes: ["node", "other"];
@@ -192,21 +192,21 @@ js_remote_object!{
         ];
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener>
             addEventListener(
                 name: impl IntoJs<String>, 
                 listener: impl IntoJs<JsFunction>, 
                 options?: &JsAddEventListenerOptions
             ) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener>
             removeEventListener(
                 name: impl IntoJs<String>, 
                 listener: impl IntoJs<JsFunction>, 
                 options?: &JsRemoveEventListenerOptions
             ) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent>
             dispatchEvent(event: impl IntoJs<JsEvent>) -> bool;
         }
     }
@@ -243,7 +243,7 @@ impl JsEventTarget {
     }
 }
 
-/// https://chromedevtools.github.io/devtools-protocol/tot/DOMDebugger/#type-EventListener
+/// <https://chromedevtools.github.io/devtools-protocol/tot/DOMDebugger/#type-EventListener>
 #[derive(Debug, Clone)]
 pub struct JsEventListener {
     /// The event listener's type.
@@ -331,7 +331,7 @@ impl JsEventListener {
 
 /// An object that specifies characteristics about the event listener.
 /// 
-/// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#options
+/// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#options>
 #[derive(Debug, Clone, Default)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct JsAddEventListenerOptions {
@@ -339,7 +339,7 @@ pub struct JsAddEventListenerOptions {
     /// listener before being dispatched to any EventTarget beneath it in the DOM tree. If not 
     /// specified, defaults to false.
     /// 
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#capture
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#capture>
     #[serde(default)]
     capture: bool,
 
@@ -347,7 +347,7 @@ pub struct JsAddEventListenerOptions {
     /// added. If true, the listener would be automatically removed when invoked. If not specified, 
     /// defaults to false.
     /// 
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#once
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#once>
     #[serde(default)]
     once: bool,
 
@@ -355,7 +355,7 @@ pub struct JsAddEventListenerOptions {
     /// call preventDefault(). If a passive listener calls preventDefault(), nothing will happen and 
     /// a console warning may be generated.
     /// 
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive>
     #[serde(default)]
     passive: bool,
 
@@ -363,7 +363,7 @@ pub struct JsAddEventListenerOptions {
     /// which owns the AbortSignal is called. If not specified, no AbortSignal is associated with 
     /// the listener.
     /// 
-    /// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#signal
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#signal>
     #[serde(default)]
     signal: Optional<JsAbortSignal>,
 }

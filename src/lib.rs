@@ -40,12 +40,12 @@
 //! }
 //! ```
 //!
-//! The [`chromiumoxide_pdl`] crate contains a [PDL
-//! parser](chromiumoxide_pdl/src/pdl/parser.rs), which is a rust rewrite of a
-//! [python script in the chromium source tree]( https://chromium.googlesource.com/deps/inspector_protocol/+/refs/heads/master/pdl.py) and a
-//! [`Generator`](chromiumoxide_pdl/src/build/generator.rs) that turns the
+//! The [`chromiumoxide_pdl`](../chromiumoxide_pdl/index.html) crate contains a [PDL
+//! parser](../chromiumoxide_pdl/pdl/parser/index.html), which is a rust rewrite of a
+//! [python script in the chromium source tree](https://chromium.googlesource.com/deps/inspector_protocol/+/refs/heads/master/pdl.py) and a
+//! [`Generator`](../chromiumoxide_pdl/build/generator/index.html) that turns the
 //! parsed PDL files into rust code. The
-//! [`chromiumoxide_cdp`](chromiumoxide_cdp) crate only purpose is to integrate
+//! [`chromiumoxide_cdp`] crate only purpose is to integrate
 //! the generator during is build process and include the generated output
 //! before compiling the crate itself. This separation is done merely because
 //! the generated output is ~60K lines of rust code (not including all the Proc

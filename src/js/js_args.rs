@@ -4,7 +4,7 @@ use super::*;
 /// 
 /// This is an internal trait used to implement function argument deserialization.
 /// It is implemented for tuples of up to 10 elements, where each element implements
-/// [`NativeValueFromJs`].
+/// [`FromJsAny`].
 pub trait FromJsArgs: private::from_js::Sealed {}
 
 macro_rules! impl_from_js_args {
@@ -30,7 +30,7 @@ impl_from_js_args!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 /// 
 /// This is an internal trait used to implement function argument serialization.
 /// It is implemented for tuples of up to 10 elements, where each element implements
-/// [`NativeValueIntoJs`].
+/// [`IntoJsAny`].
 pub trait IntoJsArgs<'a>: private::into_js::Sealed<'a> {}
 
 macro_rules! impl_into_js_args {

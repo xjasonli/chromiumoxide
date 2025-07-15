@@ -1,49 +1,49 @@
 use super::*;
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore>
     class CookieStore extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "CookieStore";
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete>
             delete(name: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete>
             #[rename = + withOptions]
             delete(options: JsCookieStoreDeleteOptions) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get>
             get(name: impl IntoJs<String>) -> Option<JsCookie>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get>
             #[rename = + withOptions]
             get(options: JsCookieStoreGetOptions) -> Option<JsCookie>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll>
             getAll() -> Vec<JsCookie>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll>
             #[rename = + withName]
             getAll(name: impl IntoJs<String>) -> Vec<JsCookie>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/getAll>
             #[rename = + withOptions]
             getAll(options: JsCookieStoreGetOptions) -> Vec<JsCookie>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set>
             set(name: impl IntoJs<String>, value: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set>
             #[rename = + withOptions]
             set(options: JsCookieStoreSetOptions) -> ();
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/delete#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsCookieStoreDeleteOptions {
@@ -55,7 +55,7 @@ pub struct JsCookieStoreDeleteOptions {
     pub path: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/get#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsCookieStoreGetOptions {
@@ -67,7 +67,7 @@ pub struct JsCookieStoreGetOptions {
     pub path: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/CookieStore/set#parameters>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsCookieStoreSetOptions {
@@ -98,7 +98,7 @@ pub struct JsCookieStoreSetOptions {
     pub same_site: Option<String>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Cookie
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Cookie>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsCookie {

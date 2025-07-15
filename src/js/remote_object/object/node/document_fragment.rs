@@ -5,15 +5,15 @@ pub mod shadow_root;
 pub use shadow_root::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment>
     class DocumentFragment extends Node inherits Object {
         static #class: ["DocumentFragment", "ShadowRoot"];
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/childElementCount
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/childElementCount>
             childElementCount: usize [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/children
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/children>
             children: JsHtmlCollection [readonly];
 
             /// Extension property
@@ -23,62 +23,62 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/firstElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/firstElementChild>
             firstElementChild: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/lastElementChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/lastElementChild>
             lastElementChild: Option<JsElement> [readonly];
         }
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append>
             append<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/append>
             #[rename = +text]
             append<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend>
             prepend<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/prepend>
             #[rename = +text]
             prepend<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelector
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelector>
             querySelector(selectors: impl IntoJs<String>) -> Option<JsElement>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelectorAll
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/querySelectorAll>
             querySelectorAll(selectors: impl IntoJs<String>) -> Vec<JsElement> {
                 const result = this.querySelectorAll(selectors);
                 return Array.from(result);
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/replaceChildren>
             replaceChildren<I, T>(...nodes: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/replaceChildren
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/replaceChildren>
             #[rename = +text]
             replaceChildren<I, T>(...texts: I) -> ()
             where
                 I: IntoIterator<Item = T>,
                 T: IntoJs<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/getElementById
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment/getElementById>
             getElementById(id: impl IntoJs<String>) -> Option<JsElement>;
 
             /// Extension

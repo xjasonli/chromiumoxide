@@ -1,33 +1,33 @@
 use super::*;
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement>
     class HtmlOptionElement extends HtmlElement inherits Element, Node, Object {
         static #class: "HTMLOptionElement";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/defaultSelected
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/defaultSelected>
             defaultSelected: bool;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/disabled
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/disabled>
             disabled: bool;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/form
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/form>
             form: Option<JsHtmlFormElement> [readonly];
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/index
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/index>
             index: u32 [readonly];
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/label
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/label>
             label: String;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/selected
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/selected>
             selected: bool;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/text
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/text>
             text: String;
             
-            /// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/value
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement/value>
             value: String;
         }
     }

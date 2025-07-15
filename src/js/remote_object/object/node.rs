@@ -1,4 +1,4 @@
-//! [DOM Node](https://developer.mozilla.org/en-US/docs/Web/API/Node) type hierarchy
+//! [DOM Node](<https://developer.mozilla.org/en-US/docs/Web/API/Node>) type hierarchy
 //!
 //! ```text
 //! Node (nodeType = 1-12)
@@ -63,16 +63,16 @@ pub use character_data::*;
 pub use attr::*;
 
 js_remote_object!(
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Node
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Node>
     class Node extends EventTarget inherits Object {
         static #subtype: "node";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/baseURI
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/baseURI>
             #[rename = base_uri]
             baseURI: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/childNodes
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/childNodes>
             childNodes: JsNodeList [readonly];
 
             /// Extension property
@@ -82,90 +82,90 @@ js_remote_object!(
                 }
             }
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/firstChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/firstChild>
             firstChild: JsNode [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isConnected
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/isConnected>
             isConnected: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/lastChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/lastChild>
             lastChild: JsNode [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/nextSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/nextSibling>
             nextSibling: Option<JsNode> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeName
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeName>
             nodeName: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType>
             nodeType: JsNodeType [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeValue
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeValue>
             nodeValue: Option<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/ownerDocument
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/ownerDocument>
             ownerDocument: Option<JsDocument> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/parentNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/parentNode>
             parentNode: Option<JsNode> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/parentElement
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/parentElement>
             parentElement: Option<JsElement> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/previousSibling
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/previousSibling>
             previousSibling: Option<JsNode> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent>
             textContent: Option<String>;
         }
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild>
             appendChild<T: IntoJs<JsNode>>(child: T) -> T::FromJs;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode>
             cloneNode(deep: bool) -> JsNode;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition>
             compareDocumentPosition<T: IntoJs<JsNode>>(other: T) -> JsDocumentPosition;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/contains
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/contains>
             contains<T: IntoJs<JsNode>>(other: T) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode>
             getRootNode(composed: bool) -> JsNode;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/hasChildNodes
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/hasChildNodes>
             hasChildNodes() -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/insertBefore
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/insertBefore>
             insertBefore<T1, T2>(new_node: T1, reference_node: T2) -> JsNode
             where
                 T1: IntoJs<JsNode>,
                 T2: IntoJs<JsNode>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isDefaultNamespace
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/isDefaultNamespace>
             isDefaultNamespace(namespace_uri: &str) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isEqualNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/isEqualNode>
             isEqualNode<T: IntoJs<JsNode>>(other: T) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/isSameNode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/isSameNode>
             isSameNode<T: IntoJs<JsNode>>(other: T) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupNamespaceURI
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupNamespaceURI>
             #[rename = lookup_namespace_uri]
             lookupNamespaceURI(prefix: &str) -> Option<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupPrefix
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/lookupPrefix>
             lookupPrefix(namespace_uri: &str) -> Option<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/normalize
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/normalize>
             normalize() -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/removeChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/removeChild>
             removeChild<T: IntoJs<JsNode>>(child: T) -> T::FromJs;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild>
             replaceChild<T1, T2>(new_child: T1, old_child: T2) -> JsNode
             where
                 T1: IntoJs<JsNode>,
@@ -208,7 +208,7 @@ impl JsNode {
 /// Represents the position of a node in the document relative to another node.
 /// 
 /// This is a bitflag enum that corresponds to the values returned by
-/// [`Node.compareDocumentPosition()`](https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition).
+/// [`Node.compareDocumentPosition()`](<https://developer.mozilla.org/en-US/docs/Web/API/Node/compareDocumentPosition>).
 /// Multiple flags can be combined to describe complex relationships between nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -233,20 +233,20 @@ bitflags::bitflags! {
 
 /// Represents the type of a DOM node.
 /// 
-/// These values correspond to the [`Node.nodeType`](https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType)
+/// These values correspond to the [`Node.nodeType`](<https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType>)
 /// property in the DOM specification. Each value identifies a specific type of node
 /// in the DOM tree.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, schemars::JsonSchema_repr)]
 #[repr(u16)]
 pub enum JsNodeType {
-    /// An Element node like <p> or <div>
+    /// An Element node like &lt;p&gt; or &lt;div&gt;
     Element = 1,
     /// An Attribute of an Element
     Attribute = 2,
     /// The actual Text inside an Element or Attr
     Text = 3,
-    /// A CDATASection, such as <!CDATA[[ ... ]]>
+    /// A CDATASection, such as &lt;![CDATA[[ ... ]]]&gt;
     CDataSection = 4,
     /// A reference to an entity (deprecated)
     EntityReference = 5,
@@ -258,7 +258,7 @@ pub enum JsNodeType {
     Comment = 8,
     /// A Document node
     Document = 9,
-    /// A DocumentType node, such as <!DOCTYPE html>
+    /// A DocumentType node, such as &lt;!DOCTYPE html&gt;
     DocumentType = 10,
     /// A DocumentFragment node
     DocumentFragment = 11,

@@ -2,194 +2,194 @@ use super::*;
 use serde_json::Value as JsonValue;
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Request#instance_methods
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Request#instance_methods>
     class Request extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "Request";
 
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/body
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/body>
             body: Option<JsReadableStream> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/bodyUsed
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/bodyUsed>
             bodyUsed: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/cache
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/cache>
             cache: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/credentials
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/credentials>
             credentials: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/destination
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/destination>
             destination: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/duplex
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/duplex>
             duplex: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/headers
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/headers>
             headers: JsHeaders [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/integrity
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/integrity>
             integrity: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/isHistoryNavigation
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/isHistoryNavigation>
             isHistoryNavigation: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/isReloadNavigation
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/isReloadNavigation>
             isReloadNavigation: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/keepalive
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/keepalive>
             keepalive: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/method
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/method>
             method: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/mode
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/mode>
             mode: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/priority
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/priority>
             priority: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/redirect
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/redirect>
             redirect: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/referrer
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/referrer>
             referrer: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/referrerPolicy
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/referrerPolicy>
             referrerPolicy: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/signal
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/signal>
             signal: JsAbortSignal [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/url
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/url>
             url: String [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/arrayBuffer
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/arrayBuffer>
             arrayBuffer() -> JsArrayBuffer;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/blob
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/blob>
             blob() -> JsBlob;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/clone
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/clone>
             clone() -> JsRequest;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/formData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/formData>
             formData() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/json
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/json>
             json() -> JsonValue;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Request/text
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Request/text>
             text() -> String;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Response
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Response>
     class Response extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "Response";
         
         properties: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/body
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/body>
             body: Option<JsReadableStream> [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/bodyUsed
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/bodyUsed>
             bodyUsed: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/headers
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/headers>
             headers: JsHeaders [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/ok
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/ok>
             ok: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/redirected
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/redirected>
             redirected: bool [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/status
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/status>
             status: u16 [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/statusText
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/statusText>
             statusText: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/type
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/type>
             #[rename = typ]
             type: String [readonly];
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/url
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/url>
             url: String [readonly];
         }
 
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/arrayBuffer
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/arrayBuffer>
             arrayBuffer() -> JsArrayBuffer;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/blob
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/blob>
             blob() -> JsBlob;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/clone
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/clone>
             clone() -> JsResponse;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/formData
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/formData>
             formData() -> JsObject;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/json
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/json>
             json() -> JsonValue;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Response/text
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Response/text>
             text() -> String;
         }
     }
 }
 
 js_remote_object!{
-    /// https://developer.mozilla.org/en-US/docs/Web/API/Headers
+    /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers>
     class Headers extends Object {
         static #type: "object";
         static #subtype: "other";
         static #class: "Headers";
         
         methods: {
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/append
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/append>
             append(name: impl IntoJs<String>, value: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/delete
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/delete>
             delete(name: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/entries
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/entries>
             entries() -> JsIterator;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/forEach
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/forEach>
             forEach(callback: impl IntoJs<JsFunction>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/get
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/get>
             get(name: impl IntoJs<String>) -> Option<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/getSetCookie
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/getSetCookie>
             getSetCookie() -> Vec<String>;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/has
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/has>
             has(name: impl IntoJs<String>) -> bool;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/keys
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/keys>
             keys() -> JsIterator;
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/set
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/set>
             set(name: impl IntoJs<String>, value: impl IntoJs<String>) -> ();
 
-            /// https://developer.mozilla.org/en-US/docs/Web/API/Headers/values
+            /// <https://developer.mozilla.org/en-US/docs/Web/API/Headers/values>
             values() -> JsIterator;
         }
     }
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/Request/Request#parameters
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Request/Request#parameters>
 /// 
 /// RequestInit is a dictionary that contains any custom settings that you want to apply to the request.
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -270,7 +270,7 @@ pub struct JsRequestInit<T> {
     pub signal: Option<JsAbortSignal>,
 }
 
-/// https://developer.mozilla.org/en-US/docs/Web/API/RequestInit#attributionreporting
+/// <https://developer.mozilla.org/en-US/docs/Web/API/RequestInit#attributionreporting>
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JsAttributionReporting {
