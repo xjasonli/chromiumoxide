@@ -780,5 +780,6 @@ pub enum TargetMessage {
     AddEventListener(EventListenerRequest),
     /// Get the `ExecutionContext` if available
     GetExecutionContext(GetExecutionContext),
+    /// Authenticate a request
     Authenticate(Credentials),
 }

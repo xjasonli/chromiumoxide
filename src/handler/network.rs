@@ -118,6 +118,7 @@ impl NetworkManager {
         if enabled == self.protocol_request_interception_enabled {
             return;
         }
+        self.protocol_request_interception_enabled = enabled;
         self.update_protocol_cache_disabled();
         self.protocol_request_interception_enabled = enabled;
         if enabled {

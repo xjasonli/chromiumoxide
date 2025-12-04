@@ -7,7 +7,7 @@ use futures::TryFutureExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let (browser, mut handler) =
+    let (browser, mut handler, _process) =
         Browser::launch(BrowserConfig::builder().with_head().build()?).await?;
 
     let handle = tokio::spawn(async move {

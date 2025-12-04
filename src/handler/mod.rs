@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 use fnv::FnvHashMap;
-use futures::channel::mpsc::Receiver;
+use futures::channel::mpsc::UnboundedReceiver;
 use futures::channel::oneshot::Sender as OneshotSender;
 use futures::stream::{Fuse, Stream, StreamExt};
 use futures::task::{Context, Poll};
@@ -31,7 +31,7 @@ use crate::handler::viewport::Viewport;
 use crate::page::Page;
 
 /// Standard timeout in MS
-pub const REQUEST_TIMEOUT: u64 = 30_000;
+pub const REQUEST_TIMEOUT: u64 = 60_000;
 
 pub mod browser;
 pub mod commandfuture;
@@ -58,9 +58,9 @@ pub struct Handler {
     /// started.
     pending_commands: FnvHashMap<CallId, (PendingRequest, MethodId, Instant)>,
     /// Connection to the browser instance
-    from_browser: Fuse<Receiver<HandlerMessage>>,
-    default_browser_context: BrowserContext,
-    browser_contexts: HashSet<BrowserContext>,
+    from_browser: Fuse<UnboundedReceiver<HandlerMessage>>,
+    //default_browser_context: BrowserContext,
+    browser_contexts: HashSet<BrowserContextId>,
     /// Used to loop over all targets in a consistent manner
     target_ids: Vec<TargetId>,
     /// The created and attached targets
@@ -90,7 +90,7 @@ impl Handler {
     /// messages on the receiver `rx`.
     pub(crate) fn new(
         mut conn: Connection<CdpEventMessage>,
-        rx: Receiver<HandlerMessage>,
+        rx: UnboundedReceiver<HandlerMessage>,
         config: HandlerConfig,
     ) -> Self {
         let discover = SetDiscoverTargetsParams::new(true);
@@ -103,13 +103,13 @@ impl Handler {
         let browser_contexts = config
             .context_ids
             .iter()
-            .map(|id| BrowserContext::from(id.clone()))
+            .map(|id| id.clone())
             .collect();
 
         Self {
             pending_commands: Default::default(),
             from_browser: rx.fuse(),
-            default_browser_context: Default::default(),
+            //default_browser_context: Default::default(),
             browser_contexts,
             target_ids: Default::default(),
             targets: Default::default(),
@@ -135,12 +135,12 @@ impl Handler {
     }
 
     /// The default Browser context
-    pub fn default_browser_context(&self) -> &BrowserContext {
-        &self.default_browser_context
-    }
+    //pub fn default_browser_context(&self) -> &BrowserContext {
+    //    &self.default_browser_context
+    //}
 
     /// Iterator over all currently available browser contexts
-    pub fn browser_contexts(&self) -> impl Iterator<Item = &BrowserContext> + '_ {
+    pub fn browser_contexts(&self) -> impl Iterator<Item = &BrowserContextId> + '_ {
         self.browser_contexts.iter()
     }
 
@@ -251,6 +251,30 @@ impl Handler {
                 PendingRequest::CloseBrowser(tx) => {
                     self.closing = true;
                     let _ = tx.send(Ok(CloseReturns {})).ok();
+                }
+                PendingRequest::CreateContext(tx) => {
+                    match to_command_response::<CreateBrowserContextParams>(resp, method) {
+                        Ok(resp) => {
+                            let browser_context_id = resp.result.browser_context_id;
+                            self.browser_contexts.insert(browser_context_id.clone());
+                            let _ = tx.send(Ok(browser_context_id)).ok();
+                        }
+                        Err(err) => {
+                            let _ = tx.send(Err(err)).ok();
+                        }
+                    }
+                }
+                PendingRequest::DisposeContext(browser_context_id, tx) => {
+                    self.browser_contexts.remove(&browser_context_id);
+
+                    match to_command_response::<DisposeBrowserContextParams>(resp, method) {
+                        Ok(_) => {
+                            let _ = tx.send(Ok(())).ok();
+                        }
+                        Err(err) => {
+                            let _ = tx.send(Err(err)).ok();
+                        }
+                    }
                 }
             }
         }
@@ -395,6 +419,39 @@ impl Handler {
         }
     }
 
+    fn create_browser_context(
+        &mut self,
+        params: CreateBrowserContextParams,
+        tx: OneshotSender<Result<BrowserContextId>>,
+    ) -> Result<()> {
+        let method = params.identifier();
+        let call_id = self.conn.submit_command(
+            method.clone(),
+            None,
+            serde_json::to_value(params)?,
+        )?;
+        self.pending_commands.insert(
+            call_id,
+            (PendingRequest::CreateContext(tx), method, Instant::now()),
+        );
+        Ok(())
+    }
+
+    fn dispose_browser_context(&mut self, browser_context_id: BrowserContextId, tx: OneshotSender<Result<()>>) -> Result<()> {
+        let params = DisposeBrowserContextParams::new(browser_context_id.clone());
+        let method = params.identifier();
+        let call_id = self.conn.submit_command(
+            method.clone(),
+            None,
+            serde_json::to_value(params)?,
+        )?;
+        self.pending_commands.insert(
+            call_id,
+            (PendingRequest::DisposeContext(browser_context_id, tx), method, Instant::now()),
+        );
+        Ok(())
+    }
+
     /// Process an incoming event read from the websocket
     fn on_event(&mut self, event: CdpEventMessage) {
         if let Some(ref session_id) = event.session_id {
@@ -426,9 +483,9 @@ impl Handler {
             .target_info
             .browser_context_id
             .clone()
-            .map(BrowserContext::from)
             .filter(|id| self.browser_contexts.contains(id))
-            .unwrap_or_else(|| self.default_browser_context.clone());
+            .map(|id| BrowserContext::from(id))
+            .unwrap_or_else(|| BrowserContext::default());
         let target = Target::new(
             event.target_info,
             TargetConfig {
@@ -511,6 +568,12 @@ impl Handler {
                     PendingRequest::CloseBrowser(tx) => {
                         let _ = tx.send(Err(CdpError::Timeout));
                     }
+                    PendingRequest::CreateContext(tx) => {
+                        let _ = tx.send(Err(CdpError::Timeout));
+                    }
+                    PendingRequest::DisposeContext(_, tx) => {
+                        let _ = tx.send(Err(CdpError::Timeout));
+                    }
                 }
             }
         }
@@ -532,46 +595,53 @@ impl Stream for Handler {
             // temporary pinning of the browser receiver should be safe as we are pinning
             // through the already pinned self. with the receivers we can also
             // safely ignore exhaustion as those are fused.
-            while let Poll::Ready(Some(msg)) = Pin::new(&mut pin.from_browser).poll_next(cx) {
+            while let Poll::Ready(msg) = Pin::new(&mut pin.from_browser).poll_next(cx) {
                 match msg {
-                    HandlerMessage::Command(cmd) => {
-                        pin.submit_external_command(cmd, now)?;
+                    Some(msg) => {
+                        match msg {
+                            HandlerMessage::Command(cmd) => {
+                                pin.submit_external_command(cmd, now)?;
+                            }
+                            HandlerMessage::FetchTargets(tx) => {
+                                pin.submit_fetch_targets(tx, now);
+                            }
+                            HandlerMessage::CloseBrowser(tx) => {
+                                pin.submit_close(tx, now);
+                            }
+                            HandlerMessage::CreatePage(params, tx) => {
+                                pin.create_page(params, tx);
+                            }
+                            HandlerMessage::GetPages(tx) => {
+                                let pages: Vec<_> = pin
+                                    .targets
+                                    .values_mut()
+                                    .filter(|p| p.is_page())
+                                    .filter_map(|target| target.get_or_create_page())
+                                    .map(|page| Page::from(page.clone()))
+                                    .collect();
+                                let _ = tx.send(pages);
+                            }
+                            HandlerMessage::CreateContext(ctx, tx) => {
+                                pin.create_browser_context(ctx, tx)?;
+                            }
+                            HandlerMessage::DisposeContext(ctx, tx) => {
+                                pin.dispose_browser_context(ctx, tx)?;
+                            }
+                            HandlerMessage::GetPage(target_id, tx) => {
+                                let page = pin
+                                    .targets
+                                    .get_mut(&target_id)
+                                    .and_then(|target| target.get_or_create_page())
+                                    .map(|page| Page::from(page.clone()));
+                                let _ = tx.send(page);
+                            }
+                            HandlerMessage::AddEventListener(req) => {
+                                pin.event_listeners.add_listener(req);
+                            }
+                        }
                     }
-                    HandlerMessage::FetchTargets(tx) => {
-                        pin.submit_fetch_targets(tx, now);
-                    }
-                    HandlerMessage::CloseBrowser(tx) => {
-                        pin.submit_close(tx, now);
-                    }
-                    HandlerMessage::CreatePage(params, tx) => {
-                        pin.create_page(params, tx);
-                    }
-                    HandlerMessage::GetPages(tx) => {
-                        let pages: Vec<_> = pin
-                            .targets
-                            .values_mut()
-                            .filter(|p| p.is_page())
-                            .filter_map(|target| target.get_or_create_page())
-                            .map(|page| Page::from(page.clone()))
-                            .collect();
-                        let _ = tx.send(pages);
-                    }
-                    HandlerMessage::InsertContext(ctx) => {
-                        pin.browser_contexts.insert(ctx);
-                    }
-                    HandlerMessage::DisposeContext(ctx) => {
-                        pin.browser_contexts.remove(&ctx);
-                    }
-                    HandlerMessage::GetPage(target_id, tx) => {
-                        let page = pin
-                            .targets
-                            .get_mut(&target_id)
-                            .and_then(|target| target.get_or_create_page())
-                            .map(|page| Page::from(page.clone()));
-                        let _ = tx.send(page);
-                    }
-                    HandlerMessage::AddEventListener(req) => {
-                        pin.event_listeners.add_listener(req);
+                    None => {
+                        return Poll::Ready(None);
                     }
                 }
             }
@@ -612,31 +682,38 @@ impl Stream for Handler {
 
             let mut done = true;
 
-            while let Poll::Ready(Some(ev)) = Pin::new(&mut pin.conn).poll_next(cx) {
+            while let Poll::Ready(ev) = Pin::new(&mut pin.conn).poll_next(cx) {
                 match ev {
-                    Ok(Message::Response(resp)) => {
-                        pin.on_response(resp);
-                        if pin.closing {
-                            // handler should stop processing
-                            return Poll::Ready(None);
+                    Some(ev) => {
+                        match ev {
+                            Ok(Message::Response(resp)) => {
+                                pin.on_response(resp);
+                                if pin.closing {
+                                    // handler should stop processing
+                                    return Poll::Ready(None);
+                                }
+                            }
+                            Ok(Message::Event(ev)) => {
+                                pin.on_event(ev);
+                            }
+                            Err(err @ CdpError::InvalidMessage(_, _)) => {
+                                if pin.config.ignore_invalid_messages {
+                                    tracing::warn!("WS Invalid message: {}", err);
+                                } else {
+                                    return Poll::Ready(Some(Err(err)));
+                                }
+                            }
+                            Err(err) => {
+                                tracing::error!("WS Connection error: {:?}", err);
+                                return Poll::Ready(Some(Err(err)));
+                            }
                         }
+                        done = false;
                     }
-                    Ok(Message::Event(ev)) => {
-                        pin.on_event(ev);
-                    }
-                    Err(err @ CdpError::InvalidMessage(_, _)) => {
-                        if pin.config.ignore_invalid_messages {
-                            tracing::warn!("WS Invalid message: {}", err);
-                        } else {
-                            return Poll::Ready(Some(Err(err)));
-                        }
-                    }
-                    Err(err) => {
-                        tracing::error!("WS Connection error: {:?}", err);
-                        return Poll::Ready(Some(Err(err)));
+                    None => {
+                        return Poll::Ready(None);
                     }
                 }
-                done = false;
             }
 
             if pin.evict_command_timeout.poll_ready(cx) {
@@ -747,6 +824,8 @@ enum PendingRequest {
     InternalCommand(TargetId),
     // A Request to close the browser.
     CloseBrowser(OneshotSender<Result<CloseReturns>>),
+    CreateContext(OneshotSender<Result<BrowserContextId>>),
+    DisposeContext(BrowserContextId, OneshotSender<Result<()>>),
 }
 
 /// Events used internally to communicate with the handler, which are executed
@@ -756,8 +835,10 @@ enum PendingRequest {
 pub(crate) enum HandlerMessage {
     CreatePage(CreateTargetParams, OneshotSender<Result<Page>>),
     FetchTargets(OneshotSender<Result<Vec<TargetInfo>>>),
-    InsertContext(BrowserContext),
-    DisposeContext(BrowserContext),
+    CreateContext(CreateBrowserContextParams, OneshotSender<Result<BrowserContextId>>),
+    DisposeContext(BrowserContextId, OneshotSender<Result<()>>),
+    //InsertContext(BrowserContext),
+    //DisposeContext(BrowserContext),
     GetPages(OneshotSender<Vec<Page>>),
     Command(CommandMessage),
     GetPage(TargetId, OneshotSender<Option<Page>>),

@@ -39,18 +39,18 @@
 //! }
 //! ```
 //!
-//! The [`chromiumoxide_pdl`] crate contains a [PDL
-//! parser](chromiumoxide_pdl/src/pdl/parser.rs), which is a rust rewrite of a
-//! [python script in the chromium source tree]( https://chromium.googlesource.com/deps/inspector_protocol/+/refs/heads/master/pdl.py) and a
-//! [`Generator`](chromiumoxide_pdl/src/build/generator.rs) that turns the
+//! The [`chromiumoxide_pdl`](../chromiumoxide_pdl/index.html) crate contains a [PDL
+//! parser](../chromiumoxide_pdl/pdl/parser/index.html), which is a rust rewrite of a
+//! [python script in the chromium source tree](https://chromium.googlesource.com/deps/inspector_protocol/+/refs/heads/master/pdl.py) and a
+//! [`Generator`](../chromiumoxide_pdl/build/generator/index.html) that turns the
 //! parsed PDL files into rust code. The
-//! [`chromiumoxide_cdp`](chromiumoxide_cdp) crate only purpose is to integrate
+//! [`chromiumoxide_cdp`] crate only purpose is to integrate
 //! the generator during is build process and include the generated output
 //! before compiling the crate itself. This separation is done merely because
 //! the generated output is ~60K lines of rust code (not including all the Proc
 //! macro extensions). So expect the compilation to take some time.
 //!
-//! The generator can be configured and used independently, see [`build.rs`] of
+//! The generator can be configured and used independently, see [build.rs] of
 //! [`chromiumoxide_cdp`].
 //!
 //! [chromedp](https://github.com/chromedp/chromedp)
@@ -59,6 +59,7 @@
 //! [puppeteer](https://github.com/puppeteer/puppeteer)
 
 #![warn(missing_debug_implementations, rust_2018_idioms)]
+#![recursion_limit = "512"]
 
 use crate::handler::http::HttpRequest;
 use std::sync::Arc;
@@ -69,19 +70,22 @@ pub use chromiumoxide_types::{self as types, Binary, Command, Method, MethodType
 
 pub use crate::browser::{Browser, BrowserConfig};
 pub use crate::conn::Connection;
-pub use crate::element::Element;
+//pub use crate::element::Element;
 pub use crate::error::Result;
 #[cfg(feature = "fetcher")]
 pub use crate::fetcher::{BrowserFetcher, BrowserFetcherOptions};
 pub use crate::handler::Handler;
 pub use crate::page::Page;
+pub use serde::{Serialize, Deserialize};
+pub use schemars::JsonSchema;
+pub use js::*;
 
 pub mod auth;
 pub mod browser;
 pub mod cmd;
 pub mod conn;
 pub mod detection;
-pub mod element;
+//pub mod element;
 pub mod error;
 #[cfg(feature = "fetcher")]
 pub mod fetcher {

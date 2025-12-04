@@ -19,7 +19,7 @@ pin_project! {
         #[pin]
         rx_command: oneshot::Receiver<M>,
         #[pin]
-        target_sender: mpsc::Sender<TargetMessage>,
+        target_sender: mpsc::UnboundedSender<TargetMessage>,
         // We need delay to be pinned because it's a future
         // and we need to be able to poll it
         // it is used to timeout the command if page was closed while waiting for response
@@ -37,7 +37,7 @@ pin_project! {
 impl<T: Command> CommandFuture<T> {
     pub fn new(
         cmd: T,
-        target_sender: mpsc::Sender<TargetMessage>,
+        target_sender: mpsc::UnboundedSender<TargetMessage>,
         session: Option<SessionId>,
     ) -> Result<Self> {
         let (tx, rx_command) = oneshot_channel::<Result<Response>>();

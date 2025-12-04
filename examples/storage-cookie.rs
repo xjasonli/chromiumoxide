@@ -7,7 +7,7 @@ use futures::StreamExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let (mut browser, mut handler) =
+    let (browser, mut handler, mut process) =
         Browser::launch(BrowserConfig::builder().with_head().build()?).await?;
     let handle = tokio::spawn(async move {
         while let Some(h) = handler.next().await {
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     browser.close().await?;
-    browser.wait().await?;
+    process.wait().await?;
     handle.await?;
 
     Ok(())

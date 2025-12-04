@@ -63,6 +63,8 @@ pub enum CdpError {
     Url(#[from] url::ParseError),
     #[error("{1}")]
     InvalidMessage(String, serde_json::Error),
+    #[error("{0}")]
+    UnexpectedValue(String),
 }
 impl CdpError {
     pub fn msg(msg: impl Into<String>) -> Self {
