@@ -16,7 +16,7 @@ pub async fn test_config<T>(config: BrowserConfig, test: T)
 where
     T: for<'a> AsyncFnOnce(&'a mut Browser),
 {
-    let (mut browser, mut handler) = Browser::launch(config).await.unwrap();
+    let (mut browser, mut handler, _process) = Browser::launch(config).await.unwrap();
 
     let handle = tokio::spawn(async move {
         while let Some(h) = handler.next().await {
