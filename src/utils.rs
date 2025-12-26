@@ -178,6 +178,7 @@ pub(crate) mod json_encoding {
     /// in the range U+0080-U+00FF (e.g., GBK byte 0xB2 becomes \u00B2).
     /// 
     /// This function collects ONLY Latin-1 range escapes and attempts GBK decoding.
+    #[allow(dead_code)]
     fn try_decode_json_string_value(json_substr: &str, enc: &'static Encoding) -> Option<String> {
         let mut bytes = Vec::new();
         let mut has_high_bytes = false;
