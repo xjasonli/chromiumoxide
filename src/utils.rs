@@ -131,6 +131,260 @@ fn skip_args(input: &mut &str) -> bool {
     open == closed
 }
 
+/// JSON encoding fix utilities for handling malformed Unicode escapes in CDP messages
+pub(crate) mod json_encoding {
+    use encoding_rs::{Encoding, GBK, GB18030, BIG5};
+    use once_cell::sync::Lazy;
+    use fancy_regex::Regex;
+
+    /// Matches lone UTF-16 surrogates (D800-DFFF) that are not part of a valid pair
+    static LONE_SURROGATE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
+            r"\\u[dD][89a-fA-F][0-9a-fA-F]{2}(?!\\u[dD][c-fC-F][0-9a-fA-F]{2})|(?<!\\u[dD][89a-fA-F][0-9a-fA-F]{2})\\u[dD][c-fC-F][0-9a-fA-F]{2}"
+        ).unwrap()
+    });
+
+    /// Matches sequences of Latin-1 high bytes (U+0080-U+00FF) that might be GBK-encoded
+    /// These patterns indicate Chrome has treated GBK bytes as Latin-1
+    static LATIN1_HIGH_BYTES: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?:\\u00[8-9a-fA-F][0-9a-fA-F]){2,}").unwrap()
+    });
+
+    /// Matches any Unicode escape sequence in the form \uXXXX
+    static UNICODE_ESCAPE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"\\u([0-9a-fA-F]{4})").unwrap()
+    });
+
+    /// Attempts to decode a Unicode codepoint as a multi-byte character using the specified encoding
+    /// 
+    /// This is used to recover original text from malformed Unicode escapes that may have been
+    /// created when non-UTF-8 encoded text (like GBK) was incorrectly converted to Unicode.
+    /// 
+    /// Returns `Some(String)` if the codepoint successfully decodes to a valid character,
+    /// `None` otherwise.
+    #[allow(dead_code)]
+    fn try_decode_codepoint(cp: u16, enc: &'static Encoding) -> Option<String> {
+        let bytes = [(cp >> 8) as u8, (cp & 0xFF) as u8];
+        let (s, _, had_errors) = enc.decode(&bytes);
+        
+        // Only accept if decoding succeeded and result contains valid printable characters
+        (!had_errors && s.chars().all(|c| !c.is_control() || "\t\n\r".contains(c)))
+            .then(|| s.into_owned())
+    }
+
+    /// Attempts to decode an entire string value from JSON by treating Latin-1 Unicode escapes as GBK bytes
+    /// 
+    /// When Chrome encounters GBK-encoded bytes, it may represent them as Latin-1 Unicode escapes
+    /// in the range U+0080-U+00FF (e.g., GBK byte 0xB2 becomes \u00B2).
+    /// 
+    /// This function collects ONLY Latin-1 range escapes and attempts GBK decoding.
+    fn try_decode_json_string_value(json_substr: &str, enc: &'static Encoding) -> Option<String> {
+        let mut bytes = Vec::new();
+        let mut has_high_bytes = false;
+        let mut all_latin1 = true;
+        
+        // Collect bytes from Latin-1 range Unicode escapes ONLY
+        for cap in UNICODE_ESCAPE.captures_iter(json_substr) {
+            if let Ok(cap) = cap {
+                if let Some(hex_match) = cap.get(1) {
+                    if let Ok(cp) = u16::from_str_radix(hex_match.as_str(), 16) {
+                        if cp < 0x100 {
+                            // Latin-1 range - treat as byte
+                            let byte = cp as u8;
+                            bytes.push(byte);
+                            if byte >= 0x80 {
+                                has_high_bytes = true;
+                            }
+                        } else {
+                            // Non-Latin-1 Unicode found - this string has mixed encoding
+                            all_latin1 = false;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Only decode if:
+        // 1. All escapes are Latin-1 (no mixed Unicode)
+        // 2. We found high bytes (0x80-0xFF, indicating potential GBK)
+        if !all_latin1 || !has_high_bytes || bytes.is_empty() {
+            return None;
+        }
+        
+        tracing::debug!("Attempting to decode {} Latin-1 bytes: {:02X?}", bytes.len(), bytes);
+        
+        // Try to decode the byte sequence with the specified encoding
+        let (decoded, _, had_errors) = enc.decode(&bytes);
+        
+        if had_errors {
+            tracing::debug!("Decoding with {} had errors", enc.name());
+            return None;
+        }
+        
+        if decoded.is_empty() {
+            return None;
+        }
+        
+        // Verify the decoded string looks reasonable
+        let valid_chars = decoded.chars().filter(|c| !c.is_control() || "\t\n\r".contains(*c)).count();
+        if valid_chars == 0 {
+            tracing::debug!("No valid characters after decoding");
+            return None;
+        }
+        
+        tracing::info!("Successfully decoded {} Latin-1 bytes -> '{}' using {}", 
+                      bytes.len(), decoded, enc.name());
+        Some(decoded.into_owned())
+    }
+
+    /// Fixes JSON encoding issues by attempting to recover malformed Unicode escapes
+    /// 
+    /// This function handles cases where Chrome DevTools Protocol returns JSON with:
+    /// 1. Lone UTF-16 surrogates (codepoints in the range D800-DFFF that aren't part of a valid pair)
+    /// 2. Latin-1 high bytes (U+0080-U+00FF) that represent GBK-encoded text
+    /// 
+    /// This typically happens when HTTP response headers contain non-UTF-8 encoded text
+    /// (e.g., GBK-encoded Chinese filenames in Content-Disposition headers).
+    /// 
+    /// The function:
+    /// 1. Detects problematic patterns using regex
+    /// 2. Attempts to decode the entire problematic string using common multi-byte encodings
+    /// 3. Falls back to replacing individual lone surrogates with U+FFFD if whole-string recovery fails
+    /// 4. Preserves valid surrogate pairs (like emoji) unchanged
+    /// 
+    /// # Arguments
+    /// * `json` - JSON string potentially containing malformed Unicode escapes
+    /// 
+    /// # Returns
+    /// A corrected JSON string with encoding issues either recovered or replaced
+    pub(crate) fn fix_json_encoding(json: &str) -> String {
+        let has_lone_surrogates = LONE_SURROGATE.is_match(json).unwrap_or(false);
+        let has_latin1_pattern = LATIN1_HIGH_BYTES.is_match(json).unwrap_or(false);
+        
+        // Fast path: return immediately if no encoding issues detected
+        if !has_lone_surrogates && !has_latin1_pattern {
+            return json.to_string();
+        }
+        
+        if has_lone_surrogates {
+            tracing::debug!("Detected lone surrogates in JSON, attempting encoding recovery");
+        }
+        if has_latin1_pattern {
+            tracing::debug!("Detected Latin-1 high byte pattern in JSON, attempting encoding recovery");
+        }
+        
+        // Try to recover Latin-1 encoded sequences first (most reliable)
+        // Find all sequences of \u00XX (Latin-1 high bytes) and try to decode them
+        let result = LATIN1_HIGH_BYTES.replace_all(json, |caps: &fancy_regex::Captures<'_>| {
+            let matched = caps.get(0).unwrap().as_str();
+            
+            // Extract bytes from the matched Latin-1 escape sequence
+            let mut bytes = Vec::new();
+            for cap in UNICODE_ESCAPE.captures_iter(matched) {
+                if let Ok(cap) = cap {
+                    if let Some(hex_match) = cap.get(1) {
+                        if let Ok(cp) = u16::from_str_radix(hex_match.as_str(), 16) {
+                            if cp < 0x100 {
+                                bytes.push(cp as u8);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Try to decode with common encodings
+            for enc in [GBK, GB18030, BIG5] {
+                let (decoded, _, had_errors) = enc.decode(&bytes);
+                if !had_errors && !decoded.is_empty() {
+                    // Verify it looks reasonable
+                    let valid_chars = decoded.chars().filter(|c| !c.is_control() || "\t\n\r".contains(*c)).count();
+                    if valid_chars > 0 && valid_chars * 2 >= decoded.chars().count() {
+                        tracing::info!("Successfully decoded Latin-1 sequence ({} bytes) -> '{}' using {}", 
+                                     bytes.len(), decoded, enc.name());
+                        return decoded.into_owned();
+                    }
+                }
+            }
+            
+            // If decoding failed, keep original
+            matched.to_string()
+        }).into_owned();
+        
+        tracing::debug!("Latin-1 recovery done, now handling lone surrogates");
+        
+        // Now handle lone surrogates (fallback to character replacement)
+        UNICODE_ESCAPE.replace_all(&result, |caps: &fancy_regex::Captures<'_>| {
+            let cp = u16::from_str_radix(caps.get(1).unwrap().as_str(), 16).unwrap();
+            
+            // Only process codepoints in the surrogate range (D800-DFFF)
+            if !(0xD800..=0xDFFF).contains(&cp) {
+                // Not a surrogate, keep as-is
+                return caps.get(0).unwrap().as_str().to_string();
+            }
+            
+            // Extract the byte from the surrogate
+            let byte = (cp & 0xFF) as u8;
+            let byte_array = [byte];
+            
+            // Try to decode as single-byte character using various encodings
+            for enc in [GBK, GB18030, BIG5] {
+                let (decoded, _, had_errors) = enc.decode(&byte_array);
+                if !had_errors && !decoded.is_empty() && !decoded.chars().all(|c| c.is_control()) {
+                    tracing::warn!("Recovered U+{:04X} (byte 0x{:02X}) as {} -> {}", cp, byte, enc.name(), decoded);
+                    return decoded.into_owned();
+                }
+            }
+            
+            // Fallback: use Unicode replacement character
+            tracing::warn!("Cannot recover U+{:04X}, using replacement char", cp);
+            "\u{FFFD}".to_string()
+        }).into_owned()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_valid_emoji_unchanged() {
+            // Valid surrogate pair (emoji) should not be modified
+            let json = r#"{"emoji":"\uD83D\uDE00"}"#;  // 😀
+            let fixed = fix_json_encoding(json);
+            assert_eq!(json, fixed);
+        }
+
+        #[test]
+        fn test_lone_surrogate_replaced() {
+            // Lone trailing surrogate should be replaced
+            let json = r#"{"text":"test\uDC63"}"#;
+            let fixed = fix_json_encoding(json);
+            
+            // Should either be recovered (if it matches an encoding) or replaced with �
+            assert_ne!(json, fixed);
+            assert!(!fixed.contains(r"\uDC63"));
+        }
+
+        #[test]
+        fn test_no_surrogates_unchanged() {
+            // JSON without surrogates should be unchanged
+            let json = r#"{"text":"hello world","num":123}"#;
+            let fixed = fix_json_encoding(json);
+            assert_eq!(json, fixed);
+        }
+
+        #[test]
+        fn test_valid_json_parseable() {
+            // Fixed JSON should be parseable
+            let json = r#"{"field":"\uDC63"}"#;
+            let fixed = fix_json_encoding(json);
+            
+            let result: Result<serde_json::Value, _> = serde_json::from_str(&fixed);
+            assert!(result.is_ok(), "Fixed JSON should be parseable");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -14,6 +14,7 @@ use chromiumoxide_types::{CallId, EventMessage, Message, MethodCall, MethodId};
 
 use crate::error::CdpError;
 use crate::error::Result;
+use crate::utils::json_encoding::fix_json_encoding;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "async-std-runtime")] {
@@ -147,11 +148,32 @@ impl<T: EventMessage + Unpin> Stream for Connection<T> {
                             Ok(msg)
                         }
                         Err(err) => {
-                            tracing::debug!(target: "chromiumoxide::conn::raw_ws::parse_errors", msg = text, "Failed to parse raw WS message");
-                            tracing::error!("Failed to deserialize WS response {}", err);
-                            // Go to the next iteration and try reading the next message
-                            // in the hopes we can reconver and continue working.
-                            continue;
+                            // Check if this is an encoding issue (lone surrogates)
+                            if err.is_syntax() && err.to_string().contains("surrogate") {
+                                tracing::debug!(target: "chromiumoxide::conn::raw_ws::parse_errors", msg = text, "Detected encoding issue, attempting recovery");
+                                
+                                // Attempt to fix encoding and retry parsing
+                                let fixed = fix_json_encoding(&text);
+                                match serde_json::from_str::<Message<T>>(&fixed) {
+                                    Ok(msg) => {
+                                        tracing::warn!("Successfully parsed after encoding recovery");
+                                        Ok(msg)
+                                    }
+                                    Err(err2) => {
+                                        tracing::debug!(target: "chromiumoxide::conn::raw_ws::parse_errors", msg = text, "Failed to parse raw WS message");
+                                        tracing::error!("Failed to deserialize WS response even after fix: {}", err2);
+                                        // Go to the next iteration and try reading the next message
+                                        // in the hopes we can recover and continue working.
+                                        continue;
+                                    }
+                                }
+                            } else {
+                                tracing::debug!(target: "chromiumoxide::conn::raw_ws::parse_errors", msg = text, "Failed to parse raw WS message");
+                                tracing::error!("Failed to deserialize WS response {}", err);
+                                // Go to the next iteration and try reading the next message
+                                // in the hopes we can recover and continue working.
+                                continue;
+                            }
                         }
                     };
                     return Poll::Ready(Some(ready));
