@@ -55,7 +55,7 @@ pub async fn eval_global<'a, R: FromJsAny>(
     if let ReturnMode::Complex = return_mode {
         if let Some(_) = &result.object_id {
             let remote_val = JsRemoteVal::from_remote_object(&page, result).await?;
-            let remote_object = JsRemoteObject::new(
+            let remote_object = JsRemoteObject::new_inner(
                 JsRemoteObjectCtx::new(page.clone(), execution_context_id),
                 remote_val
             );

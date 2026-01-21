@@ -38,7 +38,7 @@ use crate::{utils, ArcHttpRequest};
 
 #[derive(Debug, Clone)]
 pub struct Page {
-    inner: Arc<PageInner>,
+    pub(crate) inner: Arc<PageInner>,
 }
 
 impl Page {

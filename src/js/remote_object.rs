@@ -456,7 +456,17 @@ impl JsRemoteObject {
 }
 
 impl JsRemoteObject {
-    pub(crate) fn new(ctx: JsRemoteObjectCtx, data: helper::JsRemoteVal) -> Self {
+    pub async fn new(
+        page: &Page,
+        execution_context_id: ExecutionContextId,
+        remote_object: RemoteObject,
+    ) -> Result<Self> {
+        let ctx = JsRemoteObjectCtx::new(page.inner.clone(), execution_context_id);
+        let val = helper::JsRemoteVal::from_remote_object(&page.inner, remote_object).await?;
+        Ok(Self::new_inner(ctx, val))
+    }
+
+    pub(crate) fn new_inner(ctx: JsRemoteObjectCtx, data: helper::JsRemoteVal) -> Self {
         Self(Arc::new(JsRemoteObjectInner { ctx, val: data }))
     }
 

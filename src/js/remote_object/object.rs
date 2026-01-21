@@ -286,7 +286,7 @@ impl JsEventListener {
     ) -> Result<Self> {
         let handler = if let Some(handler) = cdp_listener.handler {
             let val = helper::JsRemoteVal::from_remote_object(&ctx.page, handler).await?;
-            let object = JsRemoteObject::new(ctx.clone(), val)
+            let object = JsRemoteObject::new_inner(ctx.clone(), val)
                 .downcast_unchecked::<JsObject>();
             Some(object)
         } else {
@@ -295,7 +295,7 @@ impl JsEventListener {
 
         let original_handler = if let Some(original_handler) = cdp_listener.original_handler {
             let val = helper::JsRemoteVal::from_remote_object(&ctx.page, original_handler).await?;
-            let object = JsRemoteObject::new(ctx.clone(), val)
+            let object = JsRemoteObject::new_inner(ctx.clone(), val)
                 .downcast_unchecked::<JsObject>();
             Some(object)
         } else {
@@ -310,7 +310,7 @@ impl JsEventListener {
             let result = ctx.page.execute(params).await?.result;
             let remote_object = result.object;
             let val = helper::JsRemoteVal::from_remote_object(&ctx.page, remote_object).await?;
-            let object = JsRemoteObject::new(ctx.clone(), val)
+            let object = JsRemoteObject::new_inner(ctx.clone(), val)
                 .downcast_unchecked::<JsNode>();
             Some(object)
         } else {
