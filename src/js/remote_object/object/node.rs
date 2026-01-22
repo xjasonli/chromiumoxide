@@ -132,7 +132,7 @@ js_remote_object!(
             contains<T: IntoJs<JsNode>>(other: T) -> bool;
 
             /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode>
-            getRootNode(composed: bool) -> JsNode;
+            getRootNode(options: &JsGetRootNodeOptions) -> JsNode;
 
             /// <https://developer.mozilla.org/en-US/docs/Web/API/Node/hasChildNodes>
             hasChildNodes() -> bool;
@@ -308,4 +308,16 @@ impl From<JsNodeType> for u8 {
     fn from(node_type: JsNodeType) -> Self {
         node_type.to_u8()
     }
+}
+
+
+/// <https://developer.mozilla.org/en-US/docs/Web/API/Node/getRootNode#options>
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct JsGetRootNodeOptions {
+    /// A boolean value that indicates whether the shadow root should be
+    /// returned (false, the default), or a root node beyond shadow root (true).
+    #[serde(rename = "composed")]
+    pub composed: bool,
 }
