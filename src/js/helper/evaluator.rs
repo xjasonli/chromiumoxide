@@ -224,15 +224,15 @@ pub struct Argument {
 
 impl Argument {
     pub fn new<T: IntoJsAny>(value: T) -> Result<Self> {
-        let ctx = ser::JsSerializerCtx::default();
-        let serializer = ser::JsJsonSerializer::new_json_serializer(ctx.clone());
+        let (serializer, ctx) = ser::JsJsonSerializer::new_json_serializer();
         let mut exprs = vec![];
         let (descriptor, specials) = ValueDescriptor::parse_with_expr(
             value.serialize(serializer)?,
             &mut exprs,
             &[],
         );
-        let execution_context_id = ctx.borrow()
+        let objects = ctx.get();
+        let execution_context_id = objects
             .first()
             .map(|object| object.execution_context_id());
         Ok(Self { descriptor, values: specials, exprs, execution_context_id })

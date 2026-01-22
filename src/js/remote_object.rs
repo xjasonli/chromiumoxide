@@ -494,9 +494,8 @@ impl From<&JsRemoteObject> for RemoteObjectId {
 
 impl serde::Serialize for JsRemoteObject {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if let Some(spec) = try_specialize::Specialization::<S, ser::JsJsonSerializer>::try_new() {
-            spec.specialize_ref(&serializer).add(self);
-        }
+        // Add to thread-local context (set by JsSerializer)
+        ser::add_to_current_ctx(self);
 
         self.0.serialize(serializer)
     }
@@ -862,8 +861,6 @@ impl JsObjectSubtype {
     }
 }
 
-
-unsafe impl try_specialize::LifetimeFree for JsRemoteObject {}
 
 mod private {
     #![allow(unused)]

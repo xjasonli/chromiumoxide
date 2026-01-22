@@ -3,7 +3,68 @@ use std::{cell::RefCell, rc::Rc};
 use super::JsRemoteObject;
 
 
-type Ctx = Rc<RefCell<Vec<JsRemoteObject>>>;
+#[derive(Debug, Clone)]
+pub struct Ctx {
+    objects: Rc<RefCell<Vec<JsRemoteObject>>>,
+}
+
+impl Ctx {
+    pub fn new() -> Self {
+        Self { objects: Rc::new(RefCell::new(vec![])) }
+    }
+
+    pub fn add(&self, obj: &JsRemoteObject) {
+        self.objects.borrow_mut().push(obj.clone());
+    }
+
+    pub fn get(&self) -> Vec<JsRemoteObject> {
+        self.objects.borrow().clone()
+    }
+}
+
+thread_local! {
+    static CURRENT_CTX: RefCell<Option<Ctx>> = RefCell::new(None);
+}
+
+/// Guard that clears the thread_local context when dropped
+#[derive(Debug, Clone)]
+struct CtxGuard(#[allow(dead_code)] Rc<CtxGuardInner>);
+
+#[derive(Debug)]
+struct CtxGuardInner(());
+
+impl CtxGuardInner {
+    fn new(ctx: Ctx) -> Self {
+        CURRENT_CTX.with(|current| {
+            *current.borrow_mut() = Some(ctx);
+        });
+        Self(())
+    }
+}
+
+impl Drop for CtxGuardInner {
+    fn drop(&mut self) {
+        CURRENT_CTX.with(|current| {
+            *current.borrow_mut() = None;
+        });
+    }
+}
+
+impl CtxGuard {
+    fn new(ctx: Ctx) -> Self {
+        Self(Rc::new(CtxGuardInner::new(ctx)))
+    }
+}
+
+/// Add a RemoteObject to the current serialization context (if any)
+pub fn add_to_current_ctx(obj: &JsRemoteObject) {
+    CURRENT_CTX.with(|current| {
+        if let Some(ctx) = current.borrow().as_ref() {
+            ctx.add(obj);
+        }
+    });
+}
+
 pub type JsSerializerCtx = Ctx;
 pub type JsJsonSerializer = JsSerializer<serde_json::value::Serializer>;
 unsafe impl try_specialize::LifetimeFree for JsJsonSerializer {}
@@ -11,29 +72,20 @@ unsafe impl try_specialize::LifetimeFree for JsJsonSerializer {}
 #[derive(Debug)]
 pub struct JsSerializer<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T: serde::ser::Serializer> JsSerializer<T> {
-    pub fn new(
-        inner: T,
-        ctx: Ctx,
-    ) -> Self {
-        Self { inner, ctx }
-    }
-
-    pub fn ctx(&self) -> Ctx {
-        self.ctx.clone()
-    }
-
-    pub fn add(&self, obj: &JsRemoteObject) {
-        self.ctx.borrow_mut().push(obj.clone());
+    pub fn new(inner: T) -> (Self, Ctx) {
+        let ctx = Ctx::new();
+        let guard = CtxGuard::new(ctx.clone());
+        (Self { inner, _guard: guard }, ctx)
     }
 }
 
 impl JsSerializer<serde_json::value::Serializer> {
-    pub fn new_json_serializer(ctx: JsSerializerCtx) -> Self {
-        Self::new(serde_json::value::Serializer, ctx)
+    pub fn new_json_serializer() -> (Self, JsSerializerCtx) {
+        Self::new(serde_json::value::Serializer)
     }
 }
 
@@ -116,7 +168,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_some(&value)
     }
 
@@ -136,7 +188,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_newtype_struct(name, &value)
     }
 
@@ -144,14 +196,14 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_newtype_variant(name, variant_index, variant, &value)
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
         let seq = JsSerializeSeq {
             inner: self.inner.serialize_seq(len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(seq)
     }
@@ -159,7 +211,7 @@ where
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         let tuple = JsSerializeTuple {
             inner: self.inner.serialize_tuple(len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(tuple)
     }
@@ -167,7 +219,7 @@ where
     fn serialize_tuple_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeTupleStruct, Self::Error> {
         let tuple_struct = JsSerializeTupleStruct {
             inner: self.inner.serialize_tuple_struct(name, len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(tuple_struct)
     }
@@ -175,7 +227,7 @@ where
     fn serialize_tuple_variant(self, name: &'static str, variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let tuple_variant = JsSerializeTupleVariant {
             inner: self.inner.serialize_tuple_variant(name, variant_index, variant, len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(tuple_variant)
     }
@@ -183,7 +235,7 @@ where
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         let map = JsSerializeMap {
             inner: self.inner.serialize_map(len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(map)
     }
@@ -191,7 +243,7 @@ where
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct, Self::Error> {
         let struct_ = JsSerializeStruct {
             inner: self.inner.serialize_struct(name, len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(struct_)
     }
@@ -199,7 +251,7 @@ where
     fn serialize_struct_variant(self, name: &'static str, variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeStructVariant, Self::Error> {
         let struct_variant = JsSerializeStructVariant {
             inner: self.inner.serialize_struct_variant(name, variant_index, variant, len)?,
-            ctx: self.ctx.clone(),
+            _guard: self._guard.clone(),
         };
         Ok(struct_variant)
     }
@@ -208,7 +260,7 @@ where
 #[derive(Debug)]
 pub struct JsSerialize<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::Serialize for JsSerialize<T>
@@ -216,7 +268,6 @@ where
     T: serde::ser::Serialize,
 {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let serializer = JsSerializer::new(serializer, self.ctx.clone());
         self.inner.serialize(serializer)
     }
 }
@@ -224,7 +275,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeSeq<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::SerializeSeq for JsSerializeSeq<T>
@@ -238,7 +289,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_element(&value)
     }
 
@@ -250,7 +301,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeTuple<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::SerializeTuple for JsSerializeTuple<T>
@@ -264,7 +315,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_element(&value)
     }
 
@@ -276,7 +327,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeTupleStruct<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 
@@ -291,7 +342,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_field(&value)
     }
 
@@ -303,7 +354,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeTupleVariant<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::SerializeTupleVariant for JsSerializeTupleVariant<T>
@@ -317,7 +368,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_field(&value)
     }
 
@@ -329,7 +380,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeMap<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::SerializeMap for JsSerializeMap<T>
@@ -343,7 +394,7 @@ where
     where
         V: serde::Serialize,
     {
-        let key = JsSerialize { inner: key, ctx: self.ctx.clone() };
+        let key = JsSerialize { inner: key, _guard: self._guard.clone() };
         self.inner.serialize_key(&key)
     }
 
@@ -351,7 +402,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_value(&value)
     }
 
@@ -363,7 +414,7 @@ where
 #[derive(Debug)]
 pub struct JsSerializeStruct<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
 
 impl<T> serde::ser::SerializeStruct for JsSerializeStruct<T>
@@ -377,7 +428,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_field(key, &value)
     }
 
@@ -389,8 +440,9 @@ where
 #[derive(Debug)]
 pub struct JsSerializeStructVariant<T> {
     inner: T,
-    ctx: Ctx,
+    _guard: CtxGuard,
 }
+
 
 impl<T> serde::ser::SerializeStructVariant for JsSerializeStructVariant<T>
 where
@@ -403,7 +455,7 @@ where
     where
         V: serde::Serialize,
     {
-        let value = JsSerialize { inner: value, ctx: self.ctx.clone() };
+        let value = JsSerialize { inner: value, _guard: self._guard.clone() };
         self.inner.serialize_field(key, &value)
     }
 
